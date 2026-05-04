@@ -1,0 +1,207 @@
+TỜ TRÌNH
+Về việc thanh lý và ký mới hợp đồng trạm DNXL10
+Kính trình: Ông Nguyễn Thanh Lâm – Phó Giám Đốc MobiFone Đồng Nai
+Ý kiến chỉ đạo của Lãnh đạo
+Căn cứ vào hợp đồng số 348-22/HĐ-MLMN-ĐVTĐN ký ngày 09/02/2022 giữa Trung tâm mạng lưới MobiFone miền Nam (nay MobiFone Đồng Nai tiếp nhận) và ông/bà Nguyễn Thị Phượng về việc thuê vị trí đặt trạm điện thoại di động DNXL10 tại: “Thửa đất số 1743, tờ bản đồ số 12, ấp Tân Hữu, xã Xuân Thành, huyện Xuân Lộc, tỉnh Đồng Nai (địa chỉ mới: Thửa đất số 1743, tờ bản đồ số 12, ấp Tân Hữu, Xã Xuân Thành, Đồng Nai);
+Căn cứ vào kết quả khảo sát trụ sở công an và cơ sở hạ tầng trạm Gtel gần khu vực trạm DNXL10, hiện khu vực này không có trụ sở công an và trạm Gtel.
+Căn cứ tình hình thực tế, trạm DNXL10 có vùng phủ quan trọng, khu vực đông dân cư lưu lượng (10177.04 Erl/ 4499599.7 GB);
+Căn cứ vào quyết định 02/QĐ-HĐTV ký ngày 17/01/2025 về việc ban hành quy định về đơn giá thuê mặt bằng phát triển mạng lưới thông tin di động;
+Căn cứ vào văn bản 6050/MOBIFONE-CN ngày 10/11/2025 về việc hiệu chỉnh giá thuê hạ tầng nhà trạm, IBC, cáp quang;
+Phòng Viễn Thông kính trình Giám Đốc xem xét, phê duyệt thanh lý và ký mới hợp đồng với các nội dung như sau:
+Thanh lý hợp đồng 348-22/HĐ-MLMN-ĐVTĐN ký ngày 09/02/2022 giữa Trung tâm mạng lưới MobiFone miền Nam (nay MobiFone Đồng Nai tiếp nhận) và ông/bà Nguyễn Thị Phượng từ ngày 31/01/2026.
+Ký lại hợp đồng thuê mới hạ tầng có sẵn của ông/bà Tống Thị Hoa từ ngày 01/04/2026 với các hạn mục thuê:
+Mặt Bằng
+Bảo vệ, hỗ trợ VHKT, PCCC
+Điều khoản hợp đồng mới:
+Thời hạn hợp đồng: 10 năm từ ngày 01/04/2026 đến ngày 31/03/2036
+Đơn giá (đã bao gồm các khoản thuế do Nhà Nước quy định): 3.000.000 đồng/tháng chu kì thanh toán 06 tháng/lần, thanh toán vào đầu kì. Chi tiết các khoản mục như sau:
+Kính trình Phó Giám đốc xem xét, phê duyệt để Phòng Viễn Thông có cơ sở thực hiện./.
+HỢP ĐỒNG THUÊ MẶT BẰNG VÀ HẠ TẦNG CÓ SẴN TRẠM THU PHÁT SÓNG VIỄN THÔNG (BTS)
+Tên trạm: DNXL10
+Địa chỉ trạm: Thửa đất số 101, tờ bản đồ số 19, xã Xuân Thành, Đồng Nai.
+(Kinh độ 107.43824 – Vĩ độ 11.01852)
+Số:       -26/ HĐ-MBF.ĐNa-VT
+Căn cứ Bộ luật dân sự số 91/2015/QH13 được Quốc hội nước Cộng hoà xã hội chủ nghĩa Việt Nam thông qua ngày 24/11/2015;
+Căn cứ Luật thương mại số 36/2005/QH11 được Quốc hội nước Cộng hoà xã hội chủ nghĩa Việt Nam thông qua ngày 14/06/2005;
+Căn cứ vào thỏa thuận giữa MobiFone Đồng Nai – Chi nhánh Tổng Công ty Viễn Thông MobiFone và Ông/Bà Tống Thị Hoa;
+Hôm nay, ngày        tháng         năm 2026, tại MobiFone Đồng Nai – Chi nhánh Tổng Công ty Viễn Thông MobiFone số 236A Phan Trung, phường Tam Hiệp, tỉnh Đồng Nai.
+CHÚNG TÔI GỒM:
+BÊN CHO THUÊ: Ông/Bà Tống Thị Hoa (Gọi tắt là Bên A):
+Ông		: Tống Thị Hoa
+Số CCCD	: Số 038160024446 cấp ngày 12/08/2021 tại cục QLHC về TTXH.
+Địa chỉ liên hệ: Ấp Tân Hơp, Xã Xuân Thành, Tỉnh Đồng Nai
+Điện thoại	: 0348 555 173
+Chủ tài khoản:
+Số tài khoản	:
+Tại ngân hàng:
+BÊN THUÊ: MOBIFONE ĐỒNG NAI – Chi nhánh Tổng Công ty Viễn Thông MobiFone (Gọi tắt là Bên B):
+Đại diện là	: Ông Nguyễn Thanh Lâm
+Chức vụ	: Phó Giám Đốc
+Địa chỉ	: Số 236A Phan Trung, phường Tam Hiệp, tỉnh Đồng Nai.
+Điện thoại	: 0908.326.326.
+Tài khoản số	: 007.100.168.1168 tại NH Vietcombank Tp. HCM
+Mã số thuế	: 0100686209 -129
+(Giấy UQ số 08/UQ-MBF.ĐNa ngày 22/01/2026 do Giám đốc MobiFone Đồng Nai – Chi nhánh Tổng Công ty Viễn Thông MobiFone, Ông Bùi Chí Tuệ ký)
+Sau khi thoả thuận, hai Bên cùng thống nhất ký kết hợp đồng thuê mặt bằng đặt trạm thu phát sóng viễn thông (sau đây viết tắt là BTS) và tài sản gắn liền với đất với những điều khoản như sau:
+Điều 1. Đối tượng cho thuê, mục đích và nội dung sử dụng
+Đối tượng cho thuê
+Bao gồm: Mặt bằng để xây dựng và các dịch vụ bảo vệ, hỗ trợ vận hành khai thác và phòng cháy chữa cháy nhà trạm BTS. Cụ thể như sau:
+Mặt bằng/hạ tầng có sẵn cho thuê
+Bên A đồng ý cho Bên B thuê mặt bằng/hạ tầng có sẵn thuộc quyền sử dụng/sở hữu hợp pháp của Bên A để xây dựng, cải tạo, lắp đặt trạm BTS.
+Thông tin chi tiết thửa đất như sau:
+Thửa đất số 101, tờ bản đồ 19
+Địa chỉ thửa đất: Xã Xuân Thành, Đồng Nai
+- Giấy tờ chứng minh quyền sử dụng đất gồm: giấy chứng nhận quyền sở hữu nhà ở và quyền sử dụng đất ở số CS 08575 cấp ngày 21/04/2022 tại Sở Tài Nguyên và Môi trường tỉnh Đồng Nai.
+Hạ tầng cho thuê:
+Mặt bằng có sẵn của bên A;
+Bảo vệ, hỗ trợ VHKT, PCCC.
+Bên A cam kết đáp ứng đủ điều kiện cho thuê/cho thuê lại mặt bằng theo đúng các quy định của pháp luật về đất đai.
+Các dịch vụ:
+- Dịch vụ bảo vệ:
++ Bên A hỗ trợ bảo vệ nhà trạm và các trang thiết bị mà Bên B trang bị lắp đặt tại trạm.
++ Bên A chỉ cho phép người của Bên B hoặc người có giấy tờ giới thiệu của Bên B ra vào khu vực đặt trạm.
+- Dịch vụ hỗ trợ, vận hành máy phát điện, phòng cháy chữa cháy trạm:
++ Khi trạm bị mất nguồn điện lưới (mất đột xuất hoặc mất có thông báo của điện lực sở tại) thì Bên A thông báo, hỗ trợ, vận hành máy phát điện theo yêu cầu của Bên B (nếu có).
++ Khi trạm có nguy cơ xảy ra mất an toàn như cháy nổ, ngập lụt, sạt lở đất, sụt lún đất do các nguyên nhân khách quan và chủ quan thì Bên A phải báo ngay cho chính quyền sở tại và cho Bên B, đồng thời có các biện pháp kịp thời nhằm ngăn chặn nguy cơ xảy ra để hạn chế được thấp nhất mức độ thiệt hại.
+* Số điện thoại liên lạc của Bên A: 0908934339 Anh Cảng
+* Số điện thoại liên lạc của Bên B: 0908326326 (trực ca 24/24h).
+Mục đích và nội dung sử dụng
+Bên A đồng ý cho Bên B sử dụng mặt bằng, cở sở hạ tầng trạm BTS như trên (bao gồm cả diện tích mặt bằng trồng trụ điện và khoảng không nơi dây điện đi qua) để triển khai thi công xây dựng hạ tầng và thi công đường điện hạ áp riêng, đường cáp tín hiệu cho trạm BTS tại mặt bằng thuê, sử dụng hạ tầng có sẵn triển khai lắp đặt các thiết bị trạm thông tin di động và khai thác hạ tầng các mạng thông tin, truyền thông theo đúng quy định của pháp luật.
+Công việc mà Bên B tiến hành tại mặt bằng thuê bao gồm tất cả các công tác sau:
+- Công tác khảo sát, thiết kế;
+- Các công tác thi công, xây dựng nhà trạm, cột anten, hệ thống tiếp đất chống sét, hệ thống đường điện hạ thế, đường cáp tín hiệu;
+- Các công tác lắp đặt thiết bị phụ trợ như: Máy phát điện, máy điều hoà nhiệt độ, thiết bị cắt lọc sét nguồn AC, thiết bị cảnh báo; ổn áp, bình chữa cháy, hệ thống điện sử dụng năng lượng tái tạo;
+- Các công tác lắp đặt thiết bị viễn thông tại phòng máy và trên cột treo anten;
+- Các công tác vận hành, khai thác nhà trạm và lắp đặt bổ sung nâng cấp cấu hình, thay đổi cấu hình của trạm hoặc sửa chữa, bảo dưỡng thay thế các thiết bị của trạm (thông thường Bên B sẽ tiến hành định kỳ hàng tháng hoặc có thể tiến hành ứng cứu thông tin đột xuất khi mạng lưới bị sự cố, khi đó Bên B sẽ thông báo tới Bên A);
+Các công tác nêu trên có thể do các cán bộ của Bên B trực tiếp thực hiện hoặc có thể do các nhà thầu, các đối tác của Bên B thực hiện theo thông báo về kế hoạch thực hiện của cán bộ của Bên B cho Bên A.
+Điều 2. Thời hạn cho thuê
+1. Thời hạn thuê: Mười năm
+2. Hợp đồng có hiệu lực từ ngày ký.
+3. Trước khi hợp đồng hết hạn 06 tháng, hai bên sẽ cùng nhau bàn bạc thanh lý hợp đồng hoặc thỏa thuận tiếp việc gia hạn hợp đồng.
+Điều 3. Giá thuê và phương thức thanh toán
+Giá thuê
+- Tổng cộng giá thuê hàng tháng: Giá thuê ổn định và không thay đổi trong suốt thời gian thuê là: 3.000.000 đồng/tháng
+(Số tiền thuê bằng chữ: Ba triệu đồng/tháng)
+(Có phụ lục chi tiết giá kèm theo)
+- Giá thuê trên là tất cả các khoản mà Bên B phải thanh toán cho Bên A hàng tháng. Ngoài ra Bên B không phải thanh toán cho Bên A bất cứ khoản chi nào khác.
+- Mức giá thuê trên đã bao gồm các khoản thuế, phí và lệ phí theo quy định của Nhà nước. Bên A phải nộp các khoản thuế liên quan đến việc cho thuê tài sản theo quy định hiện hành.
+- Thời điểm bắt đầu tính tiền thuê: Từ lúc xây dựng xong cột anten
+Phương thức; chu kỳ thanh toán; Hồ sơ và thời gian thanh toán
+- Phương thức thanh toán:
+Bằng tiền Việt Nam theo hình thức chuyển khoản hoặc nhờ chi hộ qua Ngân hàng.
+- Chu kỳ thanh toán:Thanh toán 6 tháng/lần vào đầu kỳ
+- Các hồ sơ thanh toán Bên A cung cấp cho Bên B tại mỗi kỳ thanh toán:
++ Bên cho thuê là cá nhân: Bản sao Căn cước công dân/ Căn cước theo Luật căn cước 2023 của chủ hợp đồng và đồng sở hữu, giấy ủy quyền trong trường hợp có ủy quyền, giấy đề nghị thanh toán đồng sở hữu ký tên và cung cấp thông tin tài khoản người thụ hưởng.
++ Bên cho thuê không phải là cá nhân: Hóa đơn tài chính hợp pháp (nếu có) hoặc Giấy cam kết của bên cho thuê, hợp đồng bản photo, giấy ủy quyền trong trường hợp có ủy quyền, giấy đề nghị thanh toán chủ hợp đồng ký tên và cung cấp thông tin tài khoản thụ hưởng
+- Đầu mối làm thủ tục thanh toán:
+MobiFone Đồng Nai– CN Tổng công ty Viễn thông MobiFone.
+Địa chỉ	: Số 236A Phan Trung, Phường Tam Hiệp, Tỉnh Đồng Nai, Việt Nam
+Điện thoại	: 0909 302 603 (chị Ngọc)
+- Thời gian thực hiện việc thanh toán: Thời gian Bên B thực hiện việc thanh toán cho Bên A: Trong vòng 30 ngày làm việc (không tính các nghỉ, ngày lễ) tính từ ngày Bên B nhận được đầy đủ các giấy tờ đề nghị thanh toán hợp lệ của Bên A.
+Điều 4. Quyền và nghĩa vụ các bên tham gia hợp đồng
+Quyền và nghĩa vụ của Bên A
+a) Quyền của Bên A
+- Được quyền yêu cầu phía Bên B thanh toán tiền thuê mặt bằng đầy đủ theo quy định tại Điều 3 của hợp đồng.
+- Được cải tạo, nâng cấp sửa chữa mặt bằng/hạ tầng có sẵn trong quá trình cho Bên B thuê, nhưng không được làm ảnh hưởng đến diện tích phần cho thuê và gây khó khăn đến hoạt động sản xuất kinh doanh của Bên B. Trường hợp gây ảnh hưởng đến quyền lợi của Bên B, Bên A phải chịu bồi thường toàn bộ thiệt hại.
+b) Nghĩa vụ của Bên A
+- Bên A cung cấp đầy đủ các giấy tờ liên quan quyền sở hữu/sử dụng đất và công trình, tài sản trên đất hoặc giấy xác nhận sở hữu/quyền sở hữu và không tranh chấp của chính quyền địa phương, địa chính địa phương (giấy tờ nhà/đất, giấy phép xây dựng, hoàn công nhà…) để bên B xin phép xây dựng trạm BTS, đồng thời Bên A đồng ý, tạo điều kiện thuận lợi cho Bên B triển khai thi công xây dựng trong quá trình hoàn thiện hồ sơ cấp phép. Nếu quá trình thi công bị dừng do thiếu giấy tờ của Bên A thì Bên B sẽ không thanh toán tiền thuê mặt bằng cho đến khi Bên A cung cấp bổ sung đầy đủ hồ sơ cho Bên B.
+- Bên A thanh toán các chi phí phát sinh khi chuyển mục đích sử dụng đất nhằm mục đích xin các loại giấy phép phục vụ việc xây dựng trạm BTS.
+- Giao mặt bằng, các công trình hạ tầng khác (nếu có) cho bên B theo đúng hợp đồng này (có biên bản bàn giao và phụ lục đính kèm).
+- Bên A phải đảm bảo mọi sự chuyển dịch quyền sở hữu nhà đất hoặc cho thuê, thế chấp,… không được ảnh hưởng quyền thuê của bên B. Trách nhiệm của hai bên vẫn phải được tiến hành theo nội dung của hợp đồng này và hợp đồng này vẫn phải có hiệu lực cho đến hết thời hạn được nêu ở điều 2, tạo mọi điều kiện thuận lợi để bên B sử dụng mặt bằng/hạ tầng có sẵn đã thuê.
+Bên A chịu trách nhiệm:
+- Bố trí vị trí và tạo điều kiện thuận lợi để bên B đặt máy phát điện, hỗ trợ, vận hành máy phát điện trong trường hợp mất điện kéo dài theo yêu cầu của Bên B (nếu có). Trường hợp có thông báo cắt điện lưới kéo dài liên tục hoặc xảy ra sự cố cháy nổ, Bên A chủ động thông báo ngay cho Bên B bằng điện thoại theo số điện thoại liên hệ ở Điều 1 của Hợp đồng này.
+- Tạo điều kiện cho Bên B lắp đặt các thiết bị viễn thông phục vụ cho việc kinh doanh của Bên B. Trong trường hợp Bên B cần lắp đặt thêm các tủ thiết bị cho trạm cũng như thêm các anten trên cột anten trong diện tích đã thuê. Bên A tạo mọi điều kiện thuận lợi và không tính thêm bất kỳ một chi phí phát sinh.
+- Giải quyết mọi vướng mắc với các hộ dân, cơ quan, đơn vị khác về vấn đề liên quan đến quyền sử dụng mặt bằng mà Bên B đã thuê.
+- Bên A phải thông báo bằng văn bản cho Bên B về việc chuyển quyền sở hữu nhà đất (mua bán, thừa kế,…) cũng như việc cho thuê, thế chấp (bổ sung các văn bản thông báo/ý kiến của bên nhận thế chấp (ngân hàng, tổ chức tín dụng) để đảm bảo Bên A đã thực hiện đủ các nghĩa vụ theo quy định của pháp luật) cho Bên B trước khi thực hiện kèm theo cam kết không gây ảnh hưởng đến những thỏa thuận giữa hai bên trong hợp đồng này.
+- Bên A phối hợp, kiểm tra giám sát khu vực nhà trạm, kịp thời thông báo cho Bên B các điều kiện không đảm bảo an toàn hoạt động của nhà trạm và các thiết bị của Bên B (hệ thống thoát nước, hệ thống điện, phòng chống cháy nổ, hệ thống tiếp đất chống sét,…). Bên A phối hợp giúp đỡ Bên B để khắc phục sửa chữa kịp thời những hư hỏng đó. Mọi việc sửa chữa đột xuất của Bên A có ảnh hưởng đến hoạt động của trạm viễn thông phải báo trước 48 giờ cho Bên B để phối hợp giải quyết.
+- Nộp các khoản thuế liên quan đến việc cho thuê theo quy định của nhà nước và phát hành hóa đơn hợp lệ cho Bên B.
+- Nếu các hộ dân hoặc chính quyền địa phương gây cản trở khiến Bên B không thể thi công và phát sóng thì Bên A có nghĩa vụ hoàn trả lại số tiền thuê mặt bằng đã thanh toán mà Bên B chưa sử dụng sau khi đã khấu trừ thuế đã nộp cho Nhà nước trong vòng 05 (năm) ngày kể từ ngày nhận được văn bản thông báo của Bên B. Đồng thời Bên B có trách nhiệm hoàn trả lại mặt bằng cho Bên A như tình trạng ban đầu.
+- Bảo đảm an ninh, an toàn khu vực nhà trạm và các vật tư thiết bị của trạm, không cho người lạ vào phòng máy hoặc can thiệp vào các thiết bị của trạm. Nếu việc cháy, hỏng, mất mát các tài sản đó do lỗi của Bên A thì Bên A phải sửa chữa, khôi phục tài sản của bên B như ban đầu. Nếu có mất mát Bên A phải báo cơ quan chức năng và bên B để cùng tìm hướng giải quyết.
+- Không được sử dụng nguồn điện cấp cho trạm BTS cho mục đích sử dụng riêng.
+- Kiểm tra giấy tờ (thẻ cán bộ CNV MobiFone, CCCD…) và tạo điều kiện thuận lợi khi các kỹ sư, công nhân viên, chuyên gia Việt Nam và nước ngoài mang máy móc thiết bị, vật tư ra vào trạm trong quá trình lắp đặt, vận hành và ứng cứu thông tin.
+- Trong mọi trường hợp (ngoại trừ bất khả kháng, trở ngại khách quan theo luật định), Bên A không được gây gián đoạn hoạt động bình thường của trạm thu 8 phát sóng và/hoặc cản trở cán bộ kỹ thuật của Bên B thực hiện công việc vận hành khai thác và ứng cứu thông tin tại trạm.
+Quyền hạn và trách nhiệm của Bên B
+Quyền của Bên B
+- Được quyền tiến hành các thủ tục pháp lý và các công việc đầu tư xây dựng trạm ngay sau khi Bên A bàn giao mặt bằng cho Bên B.
+- Được quyền khai thác cơ sở hạ tầng tại mặt bằng đã thuê đối với các đơn vị cung cấp dịch vụ truyền thông, thông tin liên lạc sau khi đã đầu tư xây dựng trạm theo đúng các quy định của Nhà nước. Tự chịu trách nhiệm 100% đối với hoạt động khai thác của mình.
+- Được quyền sử dụng diện tích mặt bằng như hai bên đã thỏa thuận để phục vụ cho quá trình xây lắp, vận hành khai thác và quản lý nhà trạm viễn thông phục vụ cho hoạt động sản xuất kinh doanh.
+- Được tiếp tục thuê theo các điều kiện đã thỏa thuận với Bên A trong trường hợp thay đổi chủ sở hữu mặt bằng/hạ tầng đã cho thuê. Trường hợp chuyển quyền sở hữu mặt bằng/hạ tầng đang cho thuê mà thời hạn hợp đồng vẫn còn thì chủ sở hữu mới có trách nhiệm tiếp tục thực hiện hợp đồng thuê mặt bằng/hạ tầng đã ký kết trước đó và ưu tiên cho Bên B thuê lại khi hết thời hạn hợp đồng
+- Được quyền nâng cấp, thay thế, bổ sung thiết bị trong thời gian thuê và tháo dỡ, thu hồi thiết bị, tài sản của Bên B trong suốt thời gian thực có hiệu lực của Hợp đồng.
+- Được quyền đơn phương chấm dứt hợp đồng mà không phải bồi thường bất cứ khoản thiệt hại nào cho Bên A trong trường hợp phát hiện Bên A vi phạm hợp đồng mà không có bất kỳ biện pháp khắc phục gì mặc dù đã nhận được thông báo của Bên B về việc yêu cầu khắc phục vi phạm.
+Nghĩa vụ của Bên B
+- Có trách nhiệm sử dụng mặt bằng đúng nội dung và mục đích đã cam kết, khi cần sửa chữa cải tạo phòng máy phải thông báo với Bên A.
+- Có trách nhiệm xây lắp công trình đúng thỏa thuận, phải tuân thủ các quy định về xây dựng cơ bản của nhà nước và không làm ảnh hưởng đến tình trạng chung của mặt bằng.
+- Thanh toán tiền thuê mặt bằng đúng thời hạn và đầy đủ.
+- Trường hợp nếu chưa có nguồn điện lưới riêng cho trạm thì Bên B sẽ được sử dụng điện của Bên A và Bên B sẽ thanh toán chi phí sử dụng điện theo thực tế phát sinh tại nguồn điện của Bên A và tuân thủ theo quy định của ngành điện.
+- Cán bộ, công nhân viên và đối tác của Bên B khi đến trạm làm nhiệm vụ phải xuất trình giấy tờ khi ra vào trạm (chứng minh nhân dân, thẻ cán bộ CNV MobiFone, Giấy giới thiệu …).
+- Tự trang bị máy phát điện dự phòng và dụng cụ phòng chống cháy nổ cho trạm.
+- Chấp hành các nội quy, quy định về giữ gìn vệ sinh môi trường tại khu vực được thuê đặt trạm.
+- Bên B không chịu bất cứ trách nhiệm gì về những phát sinh ngoài hợp đồng đã ký với Bên A.
+Điều 5.  Giải quyết các sự kiện bất khả kháng và các sự kiện khách quan khác; phạt và bồi thường thiệt hại
+Bất khả kháng
+- Sự kiện bất khả kháng là sự kiện xảy ra một cách khách quan không thể lường trước được và không thể khắc phục được mặc dù đã áp dụng mọi biện pháp cần thiết và khả năng cho phép.
+- Bất khả kháng trong hợp đồng này bao gồm một trong các trường hợp sau: Thiên tai (động đất; bão; lũ lụt, sạt lở đất, sụt lún đất); Chiến tranh; Dịch bệnh.
+- Ngay khi có bất khả kháng xảy ra, hai Bên thông báo cho nhau để cùng phối hợp giải quyết.
+Các sự kiện khách quan khác
+Sự kiện khách quan trong hợp đồng này bao gồm một trong các sự kiện sau:
+- Các Quyết định của các cơ quan quản lý Nhà nước, của chính quyền các cấp đến quá trình triển khai xây dựng, lắp đặt, vận hành khai thác trạm.
+- Sự khiếu kiện hoặc phản đối của nhân dân địa phương đến quá trình triển khai xây dựng, lắp đặt, vận hành khai thác trạm.
+- Vị trí đặt trạm không còn phù hợp với quy hoạch của Bên B do sự quy hoạch, xây dựng của các công trình lân cận.
+Khi xảy ra các sự kiện khách quan, hai Bên cũng chủ động thông báo cho nhau để cùng phối hợp giải quyết.
+Giải quyết tranh chấp phát sinh
+- Trong quá trình thực hiện hợp đồng, đối với mọi bất đồng và tranh chấp phát sinh, hai bên sẽ trước hết giải quyết thông qua thương lượng trên cơ sở thiện chí và hợp tác (cần ghi rõ biên bản). Trong trường hợp không giải quyết được, mỗi bên có quyền đưa tranh chấp ra giải quyết tại Tòa án nhân dân có thẩm quyền theo quy định của pháp luật.
+- Trong quá trình triển khai hợp đồng, nếu có các sự kiện bất khả kháng hoặc các sự kiện khách quan thì hai Bên phải chủ động và cùng phối hợp giải quyết.
+- Trong trường hợp Bên B không thể tiến hành thi công xây dựng hoặc không thể lắp đặt được các thiết bị cho trạm BTS hoặc phải tháo dỡ di chuyển trạm BTS thì hai Bên cùng tiến hành lập biên bản xác nhận và tiến hành thanh lý hợp đồng, không tiếp tục thực hiện hợp đồng thuê.
+- Số điện thoại, liên lạc của các bên:
++ Bên A:
++ Bên B: 0908326326 (trực ca 24/24h), 0908934339 Anh Cảng
+(Khi thay đổi số điện thoại và thông tin liên lạc, hai Bên sẽ chủ động thông báo cho nhau).
+Phạt và bồi thường thiệt hại
+- Trừ trường hợp bất khả kháng hoặc khách quan đã được hai bên thống nhất, nếu một bên vi phạm các nghĩa vụ quy định trong Hợp đồng này thì phải chịu một khoản tiền phạt tương ứng với 8% giá trị Hợp đồng bị vi phạm.
+- Trường hợp chấm dứt hợp đồng trái pháp luật (trừ trường hợp quy định tại Điều 6), ngoài việc trả lại tiền thuê mặt bằng/CSHT cho những tháng Bên B chưa sử dụng, Bên A phải bồi thường giá trị tương đương 03 (ba) tháng tiền thuê mặt bằng/CSHT và toàn bộ những thiệt hại phát sinh từ việc chấm dứt hợp đồng (Việc phát sinh do bên thuê thống kê gửi bên cho thuê). Thiệt hại đó bao gồm nhưng không giới hạn cả phần giá trị chưa khấu hao chi phí xây dựng, lắp đặt, sửa chữa, nâng cấp, cải tạo, di dời nhà trạm,… và toàn bộ những thiệt hại thực tế làm ảnh hưởng đến chất lượng dịch vụ do Bên B cung cấp.
+Điều 6.  Các trường hợp chấm dứt và hủy bỏ hợp đồng
+- Hết thời hạn thuê đặt trạm và hai Bên không ký phụ lục gia hạn thời gian thực hiện hợp đồng thuê.
+- Do nguyên nhân bất khả kháng hoặc các sự kiện khách quan phát sinh như quy định tại Điều 5 mà hai Bên không thể xử lý, khắc phục được.
+- Bên A không bàn giao cơ sở hạ tầng đúng như cam kết cho Bên B.
+- Một trong các Bên có quyền đơn phương chấm dứt hợp đồng trước thời hạn mà không phải chịu trách nhiệm bồi thường thiệt hại cho Bên còn lại nếu Bên còn lại vi phạm nghiêm trọng nghĩa vụ của mình trong Hợp đồng. Bên vi phạm có trách nhiệm bồi thường cho Bên bị vi phạm toàn bộ những thiệt hại về vật chất do việc chấm dứt Hợp đồng gây ra.
+- Vị trí thuê bị tiêu hủy hoặc quy hoạch giải tỏa, phá dỡ, thu hồi mở rộng đường theo quyết định của cơ quan Nhà Nước có thẩm quyền.
+- Vị trí thuê không còn phù hợp để đảm bảo chất lượng, vùng phủ sóng phục vụ khách hàng tại khu vực đặt trạm.
+- Do thỏa thuận đồng ý của hai bên.
+- Các trường hợp khác theo quy định của Pháp luật.
+Điều 7. Điều khoản chung
+- Hai bên cam kết thực hiện nghiêm chỉnh các điều khoản đã ghi trong hợp đồng này. Trong quá trình thực hiện, nếu có vấn đề gì phát sinh, hai bên sẽ thông báo cho nhau và cùng nhau bàn bạc giải quyết trên cơ sở hợp tình, hợp lý.
+- Khi xảy ra bất đồng trong tranh chấp, hai bên cố gắng giải quyết bằng thương lượng. Trong trường hợp không thể giải quyết được thì đưa đến toà án có thẩm quyền theo qui định của pháp luật.
+- Mỗi Bên không được tiết lộ cho bất cứ Bên thứ ba nào bất kỳ thông tin liên quan đến Hợp đồng trừ trường hợp được chấp thuận bằng văn bản của Bên kia hoặc theo yêu cầu của Cơ quan quản lý Nhà nước có thẩm quyền.
+- Việc sửa đổi, bổ sung Hợp đồng này phải được lập thành văn bản và có chữ ký của đại diện hợp pháp của các Bên.
+- Trong thời gian thuê, nếu Bên A yêu cầu Bên B phải chuyển trạm thì Bên A phải báo trứơc cho bên B bằng văn bản ít nhất sáu tháng (06 tháng) và:
++ Phải thanh toán số tiền còn lại (nếu có) cho Bên B kể từ ngày hai bên ký biên bản hoàn trả mặt bằng đối với khoản tiền thuê đã nhận.
++ Chịu mọi chi phí tháo dỡ, vận chuyển, xây dựng và lắp đặt lại thiết bị cho Bên B, trừ trường hợp bất khả kháng.
+- Việc giải quyết các tồn tại và phát sinh không được phép làm gián đoạn hoạt động của trạm, gây ảnh hưởng đến thông tin liên lạc trong mạng thông tin di động quốc gia.
+- Hợp đồng này được lập thành 06 (sáu) bản, Bên A giữ 02 bản, Bên B giữ 04 bản có giá trị pháp lý như nhau.
+PHỤ LỤC
+BẢNG CHI TIẾT ĐƠN GIÁ THUÊ: TRẠM DNXL10
+(kèm theo hợp đồng số     -26/HĐ-MBF.ĐNa-VT. ngày     tháng      năm 2026)
+TCT VIỄN THÔNG MOBIFONE
+MOBIFONE ĐỒNG NAI | CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM
+Độc lập - Tự do - Hạnh phúc
+Số:         /MBF.ĐNa-PVT | Đồng Nai, ngày       tháng        năm
+Hạng mục | DNXL10 | Ghi chú
+Mặt bằng | 2,400,000 | Theo văn bản số 02/QĐ-HĐTV ngày 17/01/2025
+Bảo vệ, hỗ trợ VHKT, PCCC | 600,000 | Theo văn bản số 02/QĐ-HĐTV ngày 17/01/2025
+Giá Thuê | 3,000,000
+Nơi nhận:
+-   Như trên;
+-   Lưu  PVT. | PHÒNG VIỄN THÔNG
+TRƯỞNG PHÒNG
+Nguyễn Đức Long
+TCT VIỄN THÔNG MOBIFONE
+MOBIFONE ĐỒNG NAI | CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+Độc lập – Tự Do – Hạnh Phúc
+ĐẠI DIỆN BÊN A | ĐẠI DIỆN BÊN B
+PHÓ GIÁM ĐỐC
+Tống Thị Hoa | Nguyễn Thanh Lâm
+TT | Hạng mục | Giá thuê
+ (đồng/tháng)
+1 | Thuê mặt bằng đặt trạm | 2.400.000
+2 | Bảo vệ, hỗ trợ VHKT, PCCC | 600.000
+Tổng giá thuê | 3.000.000

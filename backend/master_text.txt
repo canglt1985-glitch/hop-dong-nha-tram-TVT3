@@ -1,0 +1,78 @@
+TỜ TRÌNH
+Về việc điều chỉnh giá thuê hợp đồng trạm {{SITE_ID}}
+Kính trình: Ông Nguyễn Thanh Lâm – Phó Giám đốc MobiFone Đồng Nai
+Ý kiến chỉ đạo của Lãnh đạo MobiFone Đồng Nai
+Căn cứ hợp đồng số {{CONTRACT_NO}} ký ngày {{CONTRACT_DATE}} giữa Trung tâm Mạng lưới MobiFone miền Nam và Ông/Bà {{OWNER_NAME}} về việc thuê đặt trạm BTS địa chỉ: {{ADDRESS_OLD}} ({{ADDRESS_NEW}}).
+Căn cứ phụ lục hợp đồng kí ngày 01/12/2025 về việc chuyển chủ thể kí hợp đồng từ Trung tâm Mạng lưới MobiFone miền Nam qua MobiFone Đồng Nai của hợp đồng số {{CONTRACT_NO}};
+Căn cứ Quyết định số 02/QĐ-HĐTV ký ngày 17/01/2025 về việc ban hành quy định về đơn giá thuê mặt bằng phát triển mạng lưới thông tin di động;
+Căn cứ văn bản 1245/D01-B1-B4 ký ngày 26/02/2026 về việc triển khai các giải pháp tăng cường trong đàm phán tiết giảm chi phí thuê hạ tầng;
+Căn cứ biên bản làm việc về việc giảm chi phí thuê mặt bằng trạm {{SITE_ID}} ngày 10/03/2026.
+Phòng Viễn thông kính trình Phó Giám đốc xem xét, phê duyệt ký phụ lục điều chỉnh giá thuê hợp đồng, cụ thể như sau:
+Đơn giá thuê trước đàm phán (đồng/tháng): {{OLD_PRICE}} đồng
+Đơn giá thuê sau đàm phán (đồng/tháng): {{NEW_PRICE}} đồng
+Thời gian áp dụng giá thuê mới: Kể từ ngày 01/10/2025.
+Kính trình Phó Giám đốc xét duyệt ký phụ lục thay đổi giá thuê hợp đồng để Phòng Viễn thông có cơ sở thực hiện./.
+PHỤ LỤC HỢP ĐỒNG SỐ 02
+V/v thay đổi điều khoản hợp đồng {{CONTRACT_NO}} ({{SITE_ID}})
+Căn cứ hợp đồng số {{CONTRACT_NO}} ký ngày {{CONTRACT_DATE}} giữa Trung tâm Mạng lưới MobiFone miền Nam và Ông/Bà {{OWNER_NAME}} về việc thuê đặt trạm BTS địa chỉ: {{ADDRESS_OLD}} ({{ADDRESS_NEW}}).
+Căn cứ phụ lục hợp đồng kí ngày 01/12/2025 chuyển chủ thể kí hợp đồng từ Trung tâm Mạng lưới MobiFone miền Nam qua MobiFone Đồng Nai của hợp đồng số {{CONTRACT_NO}}
+Hôm nay, ngày     tháng     năm  2026, tại MobiFone Đồng Nai
+Một bên là: Ông/Bà {{OWNER_NAME}} (Gọi tắt là bên A)
+Chức vụ	: Chủ trạm
+Địa chỉ trạm 	:{{ADDRESS_OLD}} ({{ADDRESS_NEW}})
+Địa chỉ liên hệ	: {{CONTACT_ADDR}}
+Điện thọai   	: {{PHONE}}
+Chủ tài khoản	: {{ACCOUNT_OWNER}}
+Số tài khoản	: {{ACCOUNT_NO}}
+Ngân hàng	: {{BANK_NAME}}
+Một bên là: MobiFone Đồng Nai (Gọi tắt là bên B)
+Đại diện là 	: Ông Nguyễn Thanh Lâm
+Chức vụ	: Phó Giám đốc
+Địa chỉ	: Số 236A Phan Trung, phường Tam Hiệp, Tp Đồng Nai
+Điện thoại	: 0908 316 316
+Tài khoản 	: 0121000620394
+Ngân hàng             : Ngân Hàng TMCP Ngoại thương VN - CN Đồng Nai
+MST    	          : 0100686209-129
+(Căn cứ giấy ủy quyền số 08/UQ-MBF.ĐNa ký ngày 22/01/2026)
+Sau khi bàn bạc thỏa thuận, hai bên thống nhất ký kết phụ lục hợp đồng điều chỉnh điều khoản hợp đồng số {{CONTRACT_NO}} ký ngày {{CONTRACT_DATE}} như sau:
+Điều chỉnh điều 3: Giá thuê và Phương thước thanh toán
+Tổng giá thuê vị trí lắp đặt trạm, bảo vệ và hỗ trợ vận hàng khai thác ghi ở điều I và II được gộp tính thống nhất giữa hai bên đã bao gồm các khoản thuế do nhà nước quy định là: Giảm từ {{OLD_PRICE}} đồng/tháng thành {{NEW_PRICE}} đồng/tháng (Bằng chữ: {{NEW_PRICE_TEXT}}).
+Thời điểm bắt đầu tính tiền: Kể từ ngày 01/10/2025 đến ngày 30/09/2028
+{{DEDUCTION_TEXT}}
+Bằng tiền Việt Nam theo hình thức chuyển khoản hoặc nhờ chi hộ qua Ngân hàng.
+Thông tin tài khoản nhận thanh toán là:
+Tên tài khoản: {{ACCOUNT_OWNER}}
+Số tài khoản: {{ACCOUNT_NO}}
+Tại ngân hàng: {{BANK_NAME}}
+Bên B cam kết tài khoản nhận thanh toán là ổn định và không thay đổi trong suốt thời gian thuê, đồng thời chịu trách nhiệm nếu có bất kỳ khiếu nại nào liên quan đến việc nhận tiền thanh toán của hợp đồng này vào tài khoản nêu trên
+Trường hợp thay đổi thông tin tài khoản nhận thanh toán, Bên B phải báo trước bằng văn bản cho bên A chậm nhất là 30 ngày trước khi đến hạn của chu kỳ thanh toán kế tiếp và hai bên sẽ tiến hành ký phụ lục điều chỉnh thông tin tài khoản nhận tiền  thanh toán.
+Chu kỳ thanh toán: 06 tháng/ lần, cụ thể:
+Tổng cộng:             142.800.000
+Các điều khoản và điều kiện khác trong hợp đồng số {{CONTRACT_NO}} ký ngày {{CONTRACT_DATE}} không có gì thay đổi; các điều khoản cùng nội dung được thay thế bằng nội dung trong phụ lục này.
+Phụ lục này có hiệu lực từ ngày ký và là một phần không thể tách rời của hợp đồng số {{CONTRACT_NO}} ký ngày {{CONTRACT_DATE}}.
+Phụ lục hợp đồng này được lập thành 05 bản (năm bản), bên A giữ 02 bản, bên B giữ 03 bản và có giá trị pháp lý như nhau.
+MOBIFONE ĐỒNG NAI
+PHÒNG VIỄN THÔNG | CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM
+Độc lập - Tự do - Hạnh phúc
+Số:       /TTr-VT | Đồng Nai, ngày     tháng     năm 2026
+Hạng mục | Giá quy định theo QĐ 02/QĐ-HĐTV | Giá quy định theo văn bản 1245/D01-B1-B4 | Giảm trừ  dùng chung | Giá thuê
+(đồng/tháng) | Tỷ lệ vượt giá so với quy định
+Mặt bằng | {{MB_QĐ02}} | {{P_MB}} | {{TL_MB}}
+Phòng MFĐ | {{MFĐ_1245}} | {{P_MFD}} | {{TL_MFD}}
+Phòng máy mặt đất | {{PM_1245}} | {{P_PM}} | {{TL_PM}}
+Cột mặt đất >35m | {{COT_1245}} | {{GIAM_TRU}} | {{COT_CHOT}} | {{TL_COT}}
+Tổng cộng | {{TONG_QD}} | {{TONG_QD}} | {{TONG_QD}} | {{TONG_CHOT}} | {{TL_TONG}}
+Nơi nhận:
+- Như trên;
+- Lưu: VT; P.VT. | PHÒNG VIỄN THÔNG
+TRƯỞNG PHÒNG
+Nguyễn Đức Long
+TỔNG CÔNG TY VIỄN THÔNG MOBIFONE
+MOBIFONE ĐỒNG NAI
+_________________________________________ | CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+Độc lập - Tự do - Hạnh phúc
+__________________________
+{{PAY_ROW}}
+ĐẠI DIỆN BÊN A | ĐẠI DIỆN BÊN B
+PHÓ GIÁM ĐỐC
+{{OWNER_NAME}} | Nguyễn Thanh Lâm
