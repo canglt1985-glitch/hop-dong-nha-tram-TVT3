@@ -1,0 +1,3 @@
+[09:49] RUN SUCCESS: App running at http://localhost:5173
+[11:29] RUN SUCCESS: App running at http://localhost:5173
+[13:05] DONE: Harmonized 'Thanh lý ký lại' with 3-layer rounding, dynamic room labels, and push git.

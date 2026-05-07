@@ -1,0 +1,79 @@
+{
+    "meta": {
+        "schema_version": "1.1.0",
+        "awf_version": "3.3.0"
+    },
+    "project": {
+        "name": "BTS Contract Addendum Automation",
+        "type": "Web App / Scripting",
+        "status": "active"
+    },
+    "tech_stack": {
+        "frontend": {
+            "framework": "React 18 + Vite"
+        },
+        "backend": {
+            "language": "Python 3",
+            "framework": "FastAPI (port 8000) & Flask (port 5000)",
+            "libraries": [
+                "pandas",
+                "python-docx",
+                "dateutil.relativedelta",
+                "pydantic"
+            ]
+        },
+        "database": {
+            "format": "Excel files generated sequentially (.xlsx)"
+        }
+    },
+    "database_schema": {
+        "tables": [
+            "DATA HOP DONG.xlsx (Sheet FULL-(XHH-LK) - Master sheet)",
+            "MBF DNa_BC_VB 1245.xlsx (Sheet Chi tiết thuê trạm - Đối soát phụ)"
+        ],
+        "relationships": "App link Thông tin chủ với Giá tại trạm bằng cách so khớp Site ID (ví dụ: DNXL10)"
+    },
+    "api_endpoints": [
+        {
+            "path": "GET /api/sites",
+            "explained": "Trả về danh sách trạm và thông tin giá phân rã chuẩn đã làm tròn"
+        },
+        {
+            "path": "POST /generate/{site_id}",
+            "explained": "Xuất file Hợp đồng/Phụ lục đã điền đầy đủ thông tin chuẩn hóa"
+        }
+    ],
+    "business_rules": [
+        "Tính toán kỳ trả tiền 6 tháng/chu kỳ. Luôn luôn bắt đầu từ ngày sau chu kỳ đã thanh toán (cộng 1 ngày).",
+        "Làm tròn 3 lớp và dồn phần bù Mặt bằng chuẩn xác theo Phụ lục giảm giá:",
+        "  Lớp 1: Làm tròn Antenna Tower bao gồm cả giảm trừ dùng chung 20% (cột 67) âm.",
+        "  Lớp 2: Cộng tạm tính tổng thô rồi làm tròn xuống cho Tổng chốt hợp đồng chia chẵn 50.000 VNĐ.",
+        "  Lớp 3: Làm tròn phòng máy, máy phát điện và dồn phần sai lệch còn lại vào Mặt bằng.",
+        "Quét động phòng máy (indices 48-54) và tự động thay thế label phòng máy mặt đất thành Bệ shelter/Outdoor tương ứng.",
+        "Tự động chèn thêm dòng phụ lục Table 1 đối với các hạng mục phụ trợ ngoài dải chuẩn (indices 59-66) trước dòng Tổng cộng.",
+        "Gia hạn hợp đồng: Bắt buộc Check theo End_date Cũ (Original End Date). Nếu Original Date < 01/07/2026 => Tự động thêm 5 năm vào hợp đồng và Flag lên app màu đỏ 🔴 Cần GIA HẠN."
+    ],
+    "features": [
+        "Quét và gộp giá trị tự động cho cả Phụ lục giảm giá và Thanh lý ký lại",
+        "Template Word được đính kèm metadata tags tự động thế tag chuẩn run-preserving",
+        "Dashboard Web React/Vite cho phép chọn xuất hợp đồng đồng bộ số liệu",
+        "Chèn dòng tự động vào template Word đối với hạng mục phát sinh ngoài khung giá chuẩn"
+    ],
+    "knowledge_items": {
+        "patterns": [
+            "3-Layer Rounding Math with Remainder Allocation",
+            "Python Docx paragraph run-preserving search-and-replace",
+            "Python-docx custom insert table element (table._tbl.insert(-2, new_row._tr)"
+        ],
+        "gotchas": [
+            "Ký hợp đồng mới (Thanh lý & Ký lại) đòi hỏi data 'Hồ sơ pháp lý' (GCN QSDĐ, CMND, Ngày cấp...) cực kỳ chi tiết cho mỗi trạm, khác biệt hoàn toàn với Phụ lục. Không thể auto-gen nếu Excel master chưa bổ sung mảng dữ liệu này.",
+            "Cấu trúc Excel Master FULL-(XHH-LK) có layout dải cột hoàn toàn giống sheet Chi tiết thuê trạm nhưng bị dịch chuyển tịnh tiến đúng +5 chỉ số (Index offset).",
+            "Khi dùng chung cột anten, giảm trừ 20% được lưu dưới dạng số âm tại cột 67 (-314.000đ). Cần làm tròn gộp vào cột anten trước khi tính tổng mới.",
+            "Original_end_contract vs Extended_end_contract: luôn check Original Date để báo trạng thái gia hạn."
+        ],
+        "conventions": [
+            "Mọi giá phải f-string và pass format_vn_currency của finance module",
+            "Tên file xuất ra là SiteID_PHU_LUC.docx hoặc Thanh_Ly_Ky_Lai_SiteID.docx"
+        ]
+    }
+}
