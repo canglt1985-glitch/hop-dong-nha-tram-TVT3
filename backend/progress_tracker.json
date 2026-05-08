@@ -831,7 +831,7 @@
       "signed_and_stamped": false,
       "archived_doc": false
     },
-    "last_updated": "2026-05-08T09:09:29.591860"
+    "last_updated": "2026-05-08T13:48:16.329870"
   },
   "DNCM17": {
     "selected_template": "thanh_ly_ky_lai",
@@ -862,7 +862,7 @@
     "last_updated": "2026-05-07T16:51:34.782233"
   },
   "DNCM18": {
-    "selected_template": "thanh_ly_ky_lai",
+    "selected_template": "phu_luc_giam_gia",
     "status": "dong_y",
     "new_contract_no": "",
     "new_contract_date": "",
@@ -873,7 +873,7 @@
       "signed_and_stamped": false,
       "archived_doc": false
     },
-    "last_updated": "2026-05-08T10:13:12.440941"
+    "last_updated": "2026-05-08T13:48:53.270936"
   },
   "DNLK19": {
     "selected_template": "phu_luc_giam_gia",

@@ -317,8 +317,13 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
     cycle_months = 6
 
     if is_phu_luc:
-        # Start date for Phụ lục is always 01/10/2025
+        # Start date for Phụ lục is paid_until + 1 day, default to 01/10/2025 if empty
         curr_start = datetime(2025, 10, 1)
+        if paid_until and paid_until not in ["nan", "None"]:
+            try:
+                curr_start = datetime.strptime(paid_until[:10], "%d/%m/%Y") + relativedelta(days=1)
+            except Exception:
+                pass
         c_no = 1
         
         while curr_start < end_contract:
@@ -445,6 +450,9 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
             else:
                 row_obj = pay_table.add_row()
                 
+            row_obj.height = docx.shared.Inches(0.3)
+            row_obj.height_rule = docx.enum.table.WD_ROW_HEIGHT_RULE.EXACTLY
+            
             cell = row_obj.cells[0]
             cell.text = line
             p = cell.paragraphs[0]
@@ -453,11 +461,13 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
             for run in p.runs:
                 run.font.name = "Times New Roman"
                 run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
-                run.font.size = docx.shared.Pt(14)
+                run.font.size = docx.shared.Pt(13)
                 
         # Thêm dòng tổng cộng vào cuối bảng pay_table
         if len(periods) > 0:
             total_row = pay_table.add_row()
+            total_row.height = docx.shared.Inches(0.3)
+            total_row.height_rule = docx.enum.table.WD_ROW_HEIGHT_RULE.EXACTLY
             total_cell = total_row.cells[0]
             total_cell.text = f"Tổng cộng: {format_vn_currency(total_amount)} đồng"
             tp = total_cell.paragraphs[0]
@@ -466,7 +476,7 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
             for run in tp.runs:
                 run.font.name = "Times New Roman"
                 run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
-                run.font.size = docx.shared.Pt(14)
+                run.font.size = docx.shared.Pt(13)
                 run.bold = True
             
     if not os.path.exists(output_dir):
