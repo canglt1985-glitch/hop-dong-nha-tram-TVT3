@@ -351,10 +351,19 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
         replacements["{{ TOTAL_AMOUNT }}"] = format_vn_currency(total_amount)
     else:
         # Thanh Ly Ky Lai uses 10 periods
+        import calendar
         curr_start = start_date_dt
         for i in range(10):
-            curr_end = curr_start + relativedelta(months=cycle_months) - relativedelta(days=1)
-            amt = new_price_val * cycle_months
+            if i == 0 and curr_start.day != 1:
+                last_day = calendar.monthrange(curr_start.year, curr_start.month)[1]
+                month_end_date = curr_start.replace(day=last_day)
+                odd_days = (month_end_date - curr_start).days + 1
+                curr_end = month_end_date + relativedelta(months=cycle_months)
+                amt = round((new_price_val / 30.0) * odd_days + new_price_val * cycle_months)
+            else:
+                curr_end = curr_start + relativedelta(months=cycle_months) - relativedelta(days=1)
+                amt = new_price_val * cycle_months
+                
             total_amount += amt
             periods.append({
                 "no": i + 1,
@@ -397,7 +406,16 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
                 run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
                 run.font.size = docx.shared.Pt(14)
                 
-        if "Thời điểm bắt đầu tính tiền" in p.text or "Giảm trừ số tiền" in p.text:
+        bold_triggers = [
+            "Thời điểm bắt đầu tính tiền",
+            "Giảm trừ số tiền",
+            "Một bên là: Ông/Bà",
+            "Thông tin tài khoản nhận thanh toán là",
+            "Tên tài khoản:",
+            "Số tài khoản:",
+            "Tại ngân hàng:"
+        ]
+        if any(trigger in p.text for trigger in bold_triggers) or (owner_name and p.text.strip() == owner_name.strip()):
             for run in p.runs:
                 run.bold = True
 
@@ -420,6 +438,10 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
                             run.font.name = "Times New Roman"
                             run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
                             run.font.size = docx.shared.Pt(14)
+                            
+                    if any(trigger in p.text for trigger in bold_triggers) or (owner_name and p.text.strip() == owner_name.strip()):
+                        for run in p.runs:
+                            run.bold = True
 
     # 7. Render Payment Table
     pay_table = None
