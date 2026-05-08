@@ -1,0 +1,920 @@
+{
+  "DNCM00": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "dong_y",
+    "progress": {
+      "draft_prepared": false,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": 4500000.0,
+    "last_updated": "2026-05-07T14:06:40.941518"
+  },
+  "DNDQ20": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:41.386871"
+  },
+  "DNTP39": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:41.895834"
+  },
+  "DNTP08": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:42.405397"
+  },
+  "DNTP09": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:42.914760"
+  },
+  "DNXL42": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:43.421382"
+  },
+  "DNTN17": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "gia_han_5_nam",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:43.930031"
+  },
+  "DNCM02": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:44.440931"
+  },
+  "DNCM13": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:44.951876"
+  },
+  "DNTN23": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:45.461733"
+  },
+  "DNLK21": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:45.970636"
+  },
+  "DNDQ40": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:46.478823"
+  },
+  "DNTN30": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:46.984226"
+  },
+  "DNDQ39": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "gia_han_5_nam",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:47.492889"
+  },
+  "DNTP54": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "gia_han_5_nam",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:48.001293"
+  },
+  "DNDQ31": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "gia_han_5_nam",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:48.510036"
+  },
+  "DNCM26": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:49.019122"
+  },
+  "DNXL62": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:49.528811"
+  },
+  "DNDQ60": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:50.035815"
+  },
+  "DNLK40": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "gia_han_5_nam",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:50.544347"
+  },
+  "DNTP01": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:51.053661"
+  },
+  "DNTP04": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:51.563572"
+  },
+  "DNXL16": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:52.071915"
+  },
+  "DNXL23": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:52.581761"
+  },
+  "DNTP07": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:53.091713"
+  },
+  "DNLK75": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:53.601642"
+  },
+  "DNXL21": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:54.111664"
+  },
+  "DNTN14": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "gia_han_5_nam",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:54.621963"
+  },
+  "DNXL56": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:55.131377"
+  },
+  "DNXL37": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:55.641832"
+  },
+  "DNITNT1": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:56.150996"
+  },
+  "DNTN15": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "gia_han_5_nam",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:56.659123"
+  },
+  "DNCM11": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:57.165995"
+  },
+  "DNCM43": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:57.674002"
+  },
+  "DNCM47": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:58.181522"
+  },
+  "DNCM24": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:58.690430"
+  },
+  "DNLK01": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:59.199368"
+  },
+  "DNCM23": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:23:59.708824"
+  },
+  "DNTN24": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:00.217797"
+  },
+  "DNCM38": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:00.728344"
+  },
+  "DNLK29": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:01.235787"
+  },
+  "DNTN38": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:01.745130"
+  },
+  "DNDQ03": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:02.255625"
+  },
+  "DNLK71": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:02.765505"
+  },
+  "DNLK39": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:03.275484"
+  },
+  "DNXL68": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:03.784653"
+  },
+  "DNDQ06": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:04.293984"
+  },
+  "DNXL14": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:04.804615"
+  },
+  "DNTP30": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:05.315168"
+  },
+  "DNDQ28": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:05.824484"
+  },
+  "DNXL41": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:06.334396"
+  },
+  "DNCM27": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:06.844157"
+  },
+  "DNILKH1": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:07.353294"
+  },
+  "DNLK28": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:07.862671"
+  },
+  "DNCM34": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:08.372176"
+  },
+  "DNTP33": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:08.882000"
+  },
+  "DNXL50": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:09.392445"
+  },
+  "DNLK03": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "last_updated": "2026-05-07T14:24:09.903136"
+  },
+  "DNCM01": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "dong_y",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-07T16:39:57.760792"
+  },
+  "DNLK73": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "dong_y",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-08T09:09:29.591860"
+  },
+  "DNCM17": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "dong_y",
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-08T09:05:21.155088"
+  },
+  "DNXL10": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "dong_y",
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-07T16:51:34.782233"
+  },
+  "DNCM18": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "dong_y",
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-08T10:13:12.440941"
+  },
+  "DNLK19": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "trinh_ky_phu_luc",
+    "progress": {
+      "draft_prepared": false,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": 5250000.0,
+    "last_updated": "2026-05-08T09:17:22.204612"
+  },
+  "DNDQ43": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "dong_y",
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-08T09:57:13.083405"
+  },
+  "DNTP24": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "dong_y",
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-08T09:57:38.672700"
+  }
+}

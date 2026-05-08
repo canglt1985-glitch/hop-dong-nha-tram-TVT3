@@ -13,9 +13,10 @@ except AttributeError:
     pass
 
 # Source files
-EXCEL_PATH = r"D:\Chuyen doi so\soan HD\DATA HOP DONG.xlsx"
-TEMPLATE_PATH = r"D:\Chuyen doi so\soan HD\soan-thao-phu-luc-hd\templates\THANH LY KY LAI_TEMPLATE.docx"
-OUTPUT_DIR = r"D:\Chuyen doi so\soan HD\soan-thao-phu-luc-hd\output"
+_BASE = os.path.dirname(os.path.abspath(__file__))
+EXCEL_PATH = os.path.join(_BASE, 'data_source', 'DANH_SACH_HOP_DONG_MAT_BANG_NHA_TRAM_21_04_2026.xlsx')
+TEMPLATE_PATH = os.path.join(_BASE, 'templates', 'THANH LY KY LAI_TEMPLATE.docx')
+OUTPUT_DIR = os.path.join(_BASE, 'output')
 
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
@@ -163,7 +164,7 @@ def generate_thanh_ly_contract(site_id="DNXL10"):
     
     # 1. Load Master Excel Sheet
     print(f"Loading Master Excel from: {EXCEL_PATH}")
-    df = pd.read_excel(EXCEL_PATH, sheet_name="FULL-(XHH-LK)", header=None)
+    df = pd.read_excel(EXCEL_PATH, sheet_name="DANH_SACH_HOP_DONG_MAT_BANG_NHA", header=None)
     
     # Find the target row index
     row_idx = None

@@ -14,12 +14,13 @@ import sys
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
-# Cấu hình đường dẫn
-MASTER_EXCEL = r'd:\Chuyen doi so\soan HD\DANH_SACH_HOP_DONG_MAT_BANG_NHA_TRAM_21_04_2026.xlsx'
-PRICE_EXCEL = r'd:\Chuyen doi so\soan HD\MBF DNa_BC_VB 1245.xlsx'
-PHUONG_XA_FILE = r'd:\Chuyen doi so\soan HD\phuong xa moi.xlsx'
-MASTER_DOC = r'd:\Chuyen doi so\soan HD\soan-thao-phu-luc-hd\templates\MASTER_TEMPLATE_VFINAL.docx'
-O_DIR = r'd:\Chuyen doi so\soan HD\soan-thao-phu-luc-hd\output\batch_test'
+# Cấu hình đường dẫn (macOS - relative to this file's location)
+_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MASTER_EXCEL = os.path.join(_BASE, 'data_source', 'DANH_SACH_HOP_DONG_MAT_BANG_NHA_TRAM_21_04_2026.xlsx')
+PRICE_EXCEL  = os.path.join(_BASE, 'data_source', 'MBF ĐNa_BC_VB 1245_BÁO CÁO NGÀY.xlsx')
+PHUONG_XA_FILE = os.path.join(_BASE, 'data_source', 'phuong_xa.xlsx')
+MASTER_DOC   = os.path.join(_BASE, 'templates', 'MASTER_TEMPLATE_VFINAL.docx')
+O_DIR        = os.path.join(_BASE, 'output', 'batch_test')
 
 PHUONG_XA_MAP = {}
 
