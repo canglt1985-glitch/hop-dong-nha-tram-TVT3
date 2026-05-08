@@ -3,8 +3,12 @@ import {
   FileText, Loader2, Search, 
   Download, Layers, 
   ChevronDown, Settings, BarChart2, 
-  CheckCircle2, AlertTriangle, Filter, Copy, ExternalLink, RefreshCw
+  AlertTriangle, Filter, Copy, ExternalLink, RefreshCw
 } from 'lucide-react'
+
+import { fetchSettings, updateSettings, fetchSites, updateProgress, generateDocument } from './api/siteApi';
+import { formatCurrency, isContractExpired, isCompleted, isPriceAddendumPending, isBankAccountMismatch, matchToVt, isOutOfPriceRange, isUnpaid } from './utils/siteLogic';
+import type { Site } from './types/site';
 
 // --- BIỂU MẪU ĐĂNG KÝ (TEMPLATES REGISTRATION) ---
 const TEMPLATE_CONFIGS = [
@@ -17,6 +21,7 @@ const TEMPLATE_CONFIGS = [
 
 // --- TRẠNG THÁI TIẾN ĐỘ HỒ SƠ (PROGRESS STATUS CATEGORIES) ---
 const STATUS_CATEGORIES = [
+  { id: 'chua_xu_ly', name: 'Chưa chốt đàm phán', color: 'bg-slate-50 text-slate-700 border-slate-200', dot: 'bg-slate-400' },
   { id: 'dong_y', name: 'Đã đồng ý giảm giá', color: 'bg-sky-50 text-sky-700 border-sky-100', dot: 'bg-sky-500' },
   { id: 'trinh_ky_phu_luc', name: 'Đã trình ký phụ lục', color: 'bg-amber-50 text-amber-700 border-amber-100', dot: 'bg-amber-500' },
   { id: 'gia_han_5_nam', name: 'Đã gia hạn 5 năm', color: 'bg-orange-50 text-orange-700 border-orange-100', dot: 'bg-orange-500' },
@@ -25,74 +30,7 @@ const STATUS_CATEGORIES = [
   { id: 'da_gui_thanh_toan', name: 'Đã gửi thanh toán', color: 'bg-indigo-50 text-indigo-700 border-indigo-100', dot: 'bg-indigo-500' }
 ];
 
-interface Site {
-  site_id: string;
-  owner: string;
-  end_date: string;
-  ext_status: string;
-  old_price: number;
-  new_price: number;
-  dat_muc_tieu_1245?: string;
-  duoc_thanh_toan_1245?: string;
-  has_agreed_1245?: boolean;
-  no_addendum_needed?: boolean;
-  reached_target?: string;
-  reduction_amount?: number;
-  reduced_price?: number;
-  negotiation_date?: string;
-  effective_date?: string;
-  prices_breakdown: {
-    mb: number;
-    pm: number;
-    mfd: number;
-    cot: number;
-    giam_tru: number;
-    cot_rounded: number;
-  };
-  payment_cycle: string;
-  to_vt: string;
-  banking_info: {
-    account_owner: string;
-    account_no: string;
-    bank_name: string;
-    bank_branch: string;
-    is_owner_match: boolean;
-    match_status_text: string;
-  };
-  progress_tracker: {
-    selected_template: string;
-    status: string;
-    new_contract_no?: string;
-    new_contract_date?: string;
-    new_price_confirmed?: number;
-    progress: {
-      draft_prepared: boolean;
-      submitted_internal: boolean;
-      signed_and_stamped: boolean;
-      archived_doc: boolean;
-    };
-  };
-}
 
-// Hàm so khớp Tổ VT thông minh và linh hoạt
-const matchToVt = (siteToVt: string, filterToVt: string) => {
-  if (!siteToVt || !filterToVt) return false;
-  const sVt = siteToVt.toUpperCase().trim();
-  const fVt = filterToVt.toUpperCase().trim();
-  
-  if (sVt.includes(fVt) || fVt.includes(sVt)) return true;
-  
-  const filterDigit = fVt.replace(/\D/g, '');
-  const siteDigit = sVt.replace(/\D/g, '');
-  
-  if (filterDigit && filterDigit === siteDigit) return true;
-  if (filterDigit && sVt.includes(filterDigit)) return true;
-  
-  const vShort = 'V' + filterDigit;
-  if (sVt.includes(vShort)) return true;
-  
-  return false;
-};
 
 function App() {
   const [sites, setSites] = useState<Site[]>([])
@@ -104,16 +42,23 @@ function App() {
   // Từ khóa tìm kiếm cho bảng Master Table
   const [tableSearchQuery, setTableSearchQuery] = useState('')
   
-  // Lọc tab báo cáo thống kê: 'all' | 'expired' | 'unprocessed' | 'mismatch' | 'success'
+  // Lọc tab báo cáo thống kê: 'all' | 'expired' | 'unprocessed' | 'mismatch' | 'success' | 'outOfPrice' | 'unpaid'
   const [activeAuditFilter, setActiveAuditFilter] = useState<string>('all')
   
   // Lọc theo Tổ VT: 'all' | 'VT1' | 'VT2' | 'VT3' | 'VT4' | 'VT5'
   const [selectedToVt, setSelectedToVt] = useState<string>('all')
   
+  // Lọc theo Loại Trạm: 'all' | 'HTCS' | 'MBF' | 'VNPT'
+  const [activeTypeFilter, setActiveTypeFilter] = useState<string>('all')
+  
   const [activeMenu, setActiveMenu] = useState('Bảng điều khiển')
   const [generating, setGenerating] = useState(false)
   const [downloadFilename, setDownloadFilename] = useState<string | null>(null)
   const [savingProgress, setSavingProgress] = useState(false)
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 30
 
   // Các trường chỉnh sửa thông tin thực tế cho trạm đang chọn
   const [editStatus, setEditStatus] = useState('dong_y')
@@ -127,62 +72,9 @@ function App() {
   const [webAppUrl, setWebAppUrl] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
 
-  // --- CÁC HÀM PHÂN TÍCH VÀ BỔ TRỢ HỒ SƠ ---
-  // Định dạng đơn giá tiền Việt Nam
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-      .format(val)
-      .replace('₫', 'đ')
-  }
-
-  // Phân tích điều kiện hết hạn hợp đồng (Cần Gia Hạn, Tái Ký)
-  const isContractExpired = (site: Site) => {
-    return site.progress_tracker?.status === 'can_thanh_ly' || site.ext_status.includes('Cần gia hạn')
-  }
-
-  // Phân tích điều kiện hoàn thành (Với quy tắc VT3 đặc thù)
-  const isCompleted = (site: Site) => {
-    if (site.no_addendum_needed) return true;
-    
-    const status = site.progress_tracker?.status || 'dong_y'
-    const vt = (site.to_vt || '').toUpperCase().trim()
-    
-    if (vt.includes('VT3') || vt.includes('V3') || vt.includes('3')) {
-      // ⚠️ ĐẶC THÙ VT3: Trình ký phụ lục (trinh_ky_phu_luc) chưa thanh toán được -> CHƯA TÍNH LÀ HOÀN THÀNH!
-      // Chỉ khi đã gia hạn, ký hồ sơ, hoặc đã gửi thanh toán mới được tính là hoàn thành.
-      return ['gia_han_5_nam', 'da_ky_ho_so', 'da_gui_thanh_toan'].includes(status)
-    } else {
-      // Các tổ khác: Trình ký phụ lục trở lên đã được tính là hoàn thành
-      return ['trinh_ky_phu_luc', 'gia_han_5_nam', 'da_ky_ho_so', 'da_gui_thanh_toan'].includes(status)
-    }
-  }
-
-  // Phân tích xem trạm đã đồng ý VB1245 nhưng chưa làm phụ lục điều chỉnh giá
-  const isPriceAddendumPending = (site: Site) => {
-    // 1. Phải là trạm đã đồng ý VB1245 (có has_agreed_1245 hoặc status liên quan trong tracker)
-    const agreed1245 = site.has_agreed_1245 === true || 
-                       ['dong_y', 'trinh_ky_phu_luc', 'da_ky_ho_so', 'da_gui_thanh_toan'].includes(site.progress_tracker?.status || '');
-    
-    if (!agreed1245) return false;
-
-    // 2. Phải là trạm chưa hoàn tất/chưa xong phụ lục
-    if (isCompleted(site)) return false;
-
-    // 3. Loại trừ các trạm không cần làm phụ lục điều chỉnh giá
-    if (site.no_addendum_needed) return false;
-
-    return true;
-  }
-
-  // Phân tích trạm bị lệch thông tin chủ thể tài khoản ngân hàng (Cần điều chỉnh tài khoản)
-  const isBankAccountMismatch = (site: Site) => {
-    return site.banking_info?.is_owner_match === false
-  }
-
   // Tải cấu hình và danh sách trạm từ backend
   useEffect(() => {
-    fetch('/api/settings')
-      .then(res => res.json())
+    fetchSettings()
       .then(data => {
         if (data.spreadsheet_id) setSpreadsheetId(data.spreadsheet_id)
         if (data.web_app_url) setWebAppUrl(data.web_app_url)
@@ -192,13 +84,9 @@ function App() {
     fetchSitesList()
   }, [])
 
-  const fetchSitesList = () => {
+  const fetchSitesList = (forceRefresh: boolean = false) => {
     setLoading(true)
-    fetch('/api/sites')
-      .then(res => {
-        if (!res.ok) throw new Error('Không thể tải dữ liệu từ backend')
-        return res.json()
-      })
+    fetchSites(forceRefresh)
       .then((data: Site[]) => {
         setSites(data)
         if (data.length > 0) {
@@ -221,30 +109,26 @@ function App() {
   // Đồng bộ giá trị input khi thay đổi trạm được chọn
   useEffect(() => {
     if (selectedSite) {
-      const currentStatus = selectedSite.progress_tracker?.status || 'dong_y'
-      setEditStatus(currentStatus)
-
-      // Tự động xác định biểu mẫu thích hợp nhất dựa trên đặc thù trạm
-      let defaultTemplate = 'thanh_ly_ky_lai'
       const isSaved = !!selectedSite.progress_tracker?.last_updated
       
+      // Auto-suggest Logic (Trước 30/06/2026 -> Hợp đồng mới | Sau -> Phụ lục)
+      const isExpiringSoon = isContractExpired(selectedSite)
+      const suggestedStatus = isExpiringSoon ? 'can_thanh_ly' : 'dong_y'
+      let defaultTemplate = isExpiringSoon ? 'thanh_ly_ky_lai' : 'phu_luc_giam_gia'
+
       if (isSaved) {
+        setEditStatus(selectedSite.progress_tracker?.status || suggestedStatus)
         const storedTemplate = selectedSite.progress_tracker.selected_template
         if (storedTemplate === 'giam_gia_mbf_dn' || storedTemplate === 'phu_luc_giam_gia') {
           defaultTemplate = 'phu_luc_giam_gia'
         } else {
-          defaultTemplate = storedTemplate || 'thanh_ly_ky_lai'
+          defaultTemplate = storedTemplate || defaultTemplate
         }
       } else {
-        // Nếu chưa lưu tiến trình, suy luận thông minh theo đặc thù thực tế
-        if (currentStatus === 'can_thanh_ly') {
-          defaultTemplate = 'thanh_ly_ky_lai'
-        } else if (currentStatus === 'dong_y' || selectedSite.has_agreed_1245) {
-          defaultTemplate = 'phu_luc_giam_gia'
-        } else if (isContractExpired(selectedSite)) {
-          defaultTemplate = 'thanh_ly_ky_lai'
-        }
+        // Chưa lưu -> Ép trạng thái và biểu mẫu gợi ý
+        setEditStatus(suggestedStatus)
       }
+      
       setEditTemplate(defaultTemplate)
       
       setNewContractNo(selectedSite.progress_tracker?.new_contract_no || '')
@@ -265,6 +149,8 @@ function App() {
     let unaddended = 0
     let mismatch = 0
     let success = 0
+    let outOfPrice = 0
+    let unpaid = 0
 
     sites.forEach(s => {
       // Áp dụng bộ lọc Tổ VT đang chọn bằng hàm matchToVt thông minh
@@ -277,6 +163,8 @@ function App() {
       if (isPriceAddendumPending(s)) unaddended++
       if (isBankAccountMismatch(s)) mismatch++
       if (isCompleted(s)) success++
+      if (isOutOfPriceRange(s)) outOfPrice++
+      if (isUnpaid(s)) unpaid++
     })
 
     return {
@@ -284,7 +172,9 @@ function App() {
       expired,
       unaddended,
       mismatch,
-      success
+      success,
+      outOfPrice,
+      unpaid
     }
   }, [sites, selectedToVt])
 
@@ -327,6 +217,14 @@ function App() {
       if (activeAuditFilter === 'unprocessed' && !isPriceAddendumPending(s)) return false
       if (activeAuditFilter === 'mismatch' && !isBankAccountMismatch(s)) return false
       if (activeAuditFilter === 'success' && !isCompleted(s)) return false
+      if (activeAuditFilter === 'outOfPrice' && !isOutOfPriceRange(s)) return false
+      if (activeAuditFilter === 'unpaid' && !isUnpaid(s)) return false
+
+      // 2b. Lọc theo Loại Trạm (HTCS, MBF, v.v.)
+      if (activeTypeFilter !== 'all') {
+        const t = (s.site_type || '').toUpperCase()
+        if (!t.includes(activeTypeFilter.toUpperCase())) return false
+      }
 
       // 3. Lọc theo từ khóa tìm kiếm (Mã trạm, tên chủ trạm, chủ tài khoản)
       if (tableSearchQuery) {
@@ -340,7 +238,20 @@ function App() {
 
       return true
     })
-  }, [sites, activeAuditFilter, selectedToVt, tableSearchQuery])
+  }, [sites, activeAuditFilter, selectedToVt, activeTypeFilter, tableSearchQuery])
+
+  // Reset pagination khi bộ lọc thay đổi
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeAuditFilter, selectedToVt, activeTypeFilter, tableSearchQuery])
+
+  // Dữ liệu phân trang
+  const paginatedSites = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredSites.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredSites, currentPage])
+
+  const totalPages = Math.ceil(filteredSites.length / ITEMS_PER_PAGE)
 
   // Thống kê chi tiết theo Tổ Viễn Thông (Tổ VT)
   const vtStats = useMemo(() => {
@@ -381,12 +292,7 @@ function App() {
       new_price_confirmed: newPriceConfirmed ? parseFloat(newPriceConfirmed) : undefined
     }
 
-    fetch('/api/progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
+    updateProgress(payload)
     .then(data => {
       setSavingProgress(false)
       if (data.success) {
@@ -441,10 +347,7 @@ function App() {
     
     setEditStatus(autoStatus)
     
-    fetch('/api/progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    updateProgress({
         site_id: selectedSite.site_id,
         selected_template: editTemplate,
         status: autoStatus,
@@ -452,9 +355,7 @@ function App() {
         new_contract_no: newContractNo,
         new_contract_date: newContractDate,
         new_price_confirmed: newPriceConfirmed ? parseFloat(newPriceConfirmed) : undefined
-      })
     })
-    .then(res => res.json())
     .then(data => {
       if (data.success) {
         setSites(prev => prev.map(s => {
@@ -478,15 +379,10 @@ function App() {
   // Lưu cấu hình Google Sheets cài đặt hệ thống
   const handleSaveSettings = () => {
     setSavingSettings(true)
-    fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    updateSettings({
         spreadsheet_id: spreadsheetId,
         web_app_url: webAppUrl
       })
-    })
-    .then(res => res.json())
     .then(data => {
       setSavingSettings(false)
       if (data.success) {
@@ -507,15 +403,7 @@ function App() {
     setGenerating(true)
     setDownloadFilename(null)
 
-    fetch(`/api/generate/${selectedSite.site_id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template_type: editTemplate })
-    })
-    .then(res => {
-      if (!res.ok) throw new Error('Không thể sinh mẫu văn bản này!')
-      return res.json()
-    })
+    generateDocument(selectedSite.site_id, editTemplate)
     .then(data => {
       if (data.success) {
         setDownloadFilename(data.filename)
@@ -685,12 +573,12 @@ function doPost(e) {
 
           <div className="flex items-center gap-5">
             <button 
-              onClick={fetchSitesList} 
-              title="Đồng bộ lại từ Google Sheets / Excel"
+              onClick={() => fetchSitesList(true)} 
+              title="Đồng bộ lại từ Google Sheets / Excel (Bỏ qua Cache)"
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-[10px] font-black uppercase text-slate-700 rounded-lg transition-colors cursor-pointer border border-slate-200"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              Tải lại dữ liệu
+              Đồng bộ dữ liệu
             </button>
             <div className="w-px h-6 bg-slate-200" />
             <div className="flex items-center gap-3 select-none">
@@ -716,90 +604,7 @@ function doPost(e) {
                 {/* PHẦN TRÁI (65%): BÁO CÁO THỐNG KÊ CHẤT LƯỢNG & BẢNG MASTER TABLE */}
                 <div className="w-2/3 h-full overflow-y-auto p-6 space-y-5 border-r border-[#E2E8F0]">
                   
-                  {/* BỘ LỌC CHỌN TỔ VIỄN THÔNG (Interactive Group Selector) */}
-                  <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">🏢 Lọc nhanh theo Tổ Viễn Thông:</span>
-                      {selectedToVt !== 'all' && (
-                        <span className="text-[9px] bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-black animate-pulse">
-                          Đang xem số liệu Tổ {selectedToVt}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setSelectedToVt('all')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${selectedToVt === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 hover:bg-slate-100 text-slate-600'}`}
-                      >
-                        Tất cả Tổ VT ({sites.length})
-                      </button>
-                      {['VT1', 'VT2', 'VT3', 'VT4', 'VT5'].map(vtName => {
-                        const count = sites.filter(s => matchToVt(s.to_vt, vtName)).length
-                        return (
-                          <button
-                            key={vtName}
-                            onClick={() => setSelectedToVt(vtName)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${selectedToVt === vtName ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 hover:bg-slate-100 text-slate-600'}`}
-                          >
-                            Tổ {vtName} ({count})
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {/* BẢNG CHỈ SỐ THỐNG KÊ QUẢN TRỊ (5 Audit Indicator Cards - DYNAMIC BY SELECTED TO_VT) */}
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                    {/* Card 1: Tất cả */}
-                    <button
-                      onClick={() => setActiveAuditFilter('all')}
-                      className={`p-3.5 rounded-xl border text-left transition-all relative ${activeAuditFilter === 'all' ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/10' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}
-                    >
-                      <span className="text-[10px] uppercase font-black tracking-wider block opacity-80">Tổng Trạm BTS</span>
-                      <span className="text-xl font-black block mt-1 leading-none">{statsCounts.all}</span>
-                      <span className="text-[9px] mt-2 block font-medium opacity-90">Theo bộ lọc</span>
-                    </button>
-
-                    {/* Card 2: Trạm gia hạn, tái ký */}
-                    <button
-                      onClick={() => setActiveAuditFilter('expired')}
-                      className={`p-3.5 rounded-xl border text-left transition-all relative ${activeAuditFilter === 'expired' ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-500/10' : 'bg-white hover:bg-slate-50 border-rose-200 text-slate-600'}`}
-                    >
-                      <span className="text-[10px] uppercase font-black tracking-wider block text-rose-500 opacity-90">Cần Gia Hạn, Tái Ký</span>
-                      <span className="text-xl font-black block mt-1 leading-none text-rose-600" style={{ color: activeAuditFilter === 'expired' ? 'white' : undefined }}>{statsCounts.expired}</span>
-                      <span className="text-[9px] mt-2 block font-black text-rose-500" style={{ color: activeAuditFilter === 'expired' ? 'white' : undefined }}>⚠️ Hết hạn HĐ</span>
-                    </button>
-
-                    {/* Card 3: Chưa làm phụ lục điều chỉnh giá (đã đồng ý VB1245 nhưng chưa làm phụ lục) */}
-                    <button
-                      onClick={() => setActiveAuditFilter('unprocessed')}
-                      className={`p-3.5 rounded-xl border text-left transition-all relative ${activeAuditFilter === 'unprocessed' ? 'bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-500/10' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}
-                    >
-                      <span className="text-[10px] uppercase font-black tracking-wider block text-amber-500 opacity-90">Chưa làm PL (1245)</span>
-                      <span className="text-xl font-black block mt-1 leading-none text-amber-600" style={{ color: activeAuditFilter === 'unprocessed' ? 'white' : undefined }}>{statsCounts.unaddended}</span>
-                      <span className="text-[9px] mt-2 block font-black text-amber-500" style={{ color: activeAuditFilter === 'unprocessed' ? 'white' : undefined }}>⚙️ Đồng ý, chưa PL</span>
-                    </button>
-
-                    {/* Card 4: Cần điều chỉnh tài khoản thanh toán (Lệch chủ) */}
-                    <button
-                      onClick={() => setActiveAuditFilter('mismatch')}
-                      className={`p-3.5 rounded-xl border text-left transition-all relative ${activeAuditFilter === 'mismatch' ? 'bg-orange-600 text-white border-orange-600 shadow-md shadow-orange-500/10' : 'bg-white hover:bg-slate-50 border-rose-200 text-slate-600'}`}
-                    >
-                      <span className="text-[10px] uppercase font-black tracking-wider block text-orange-500 opacity-90">Lệch tài khoản</span>
-                      <span className="text-xl font-black block mt-1 leading-none text-orange-600" style={{ color: activeAuditFilter === 'mismatch' ? 'white' : undefined }}>{statsCounts.mismatch}</span>
-                      <span className="text-[9px] mt-2 block font-black text-orange-500" style={{ color: activeAuditFilter === 'mismatch' ? 'white' : undefined }}>⚖️ Cần chỉnh tài khoản</span>
-                    </button>
-
-                    {/* Card 5: Đã Hoàn Thành */}
-                    <button
-                      onClick={() => setActiveAuditFilter('success')}
-                      className={`p-3.5 rounded-xl border text-left transition-all relative ${activeAuditFilter === 'success' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/10' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}
-                    >
-                      <span className="text-[10px] uppercase font-black tracking-wider block text-emerald-500 opacity-90">Đã Hoàn Thành</span>
-                      <span className="text-xl font-black block mt-1 leading-none text-emerald-600" style={{ color: activeAuditFilter === 'success' ? 'white' : undefined }}>{statsCounts.success}</span>
-                      <span className="text-[9px] mt-2 block font-black text-emerald-500" style={{ color: activeAuditFilter === 'success' ? 'white' : undefined }}>✅ Đã hoàn tất</span>
-                    </button>
-                  </div>
+                  {/* Đã xóa các bộ lọc bự ở đây để nhường chỗ cho Table Header Filters */}
 
                   {/* KHU VỰC DANH SÁCH MASTER AUDIT TABLE (BảngMaster đối soát) */}
                   <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm space-y-4">
@@ -825,28 +630,77 @@ function doPost(e) {
                       </div>
                     </div>
 
+                    {/* Thanh công cụ lọc: Filter Bar */}
+                    <div className="flex flex-wrap items-center gap-3 py-1">
+                      {/* Tổ VT Filter */}
+                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg p-1 shadow-sm">
+                        <span className="text-[10px] font-bold text-slate-500 pl-2">Tổ:</span>
+                        {['all', 'VT1', 'VT2', 'VT3', 'VT4', 'VT5'].map(vt => (
+                          <button 
+                            key={vt}
+                            onClick={() => setSelectedToVt(vt)}
+                            className={`px-2 py-1 text-[10px] font-black rounded transition-all ${selectedToVt === vt ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-slate-200'}`}
+                          >
+                            {vt === 'all' ? 'Tất cả' : vt}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Loại Trạm Filter */}
+                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg p-1 shadow-sm">
+                        <span className="text-[10px] font-bold text-slate-500 pl-2">Loại:</span>
+                        {['all', 'HTCS', 'MBF', 'VNPT'].map(type => (
+                          <button 
+                            key={type}
+                            onClick={() => setActiveTypeFilter(type)}
+                            className={`px-2 py-1 text-[10px] font-black rounded transition-all ${activeTypeFilter === type ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-slate-200'}`}
+                          >
+                            {type === 'all' ? 'Tất cả' : type}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Tình trạng Filter */}
+                      <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg p-1 shadow-sm">
+                        <span className="text-[10px] font-bold text-blue-800 pl-2">Tình trạng:</span>
+                        <select 
+                          value={activeAuditFilter}
+                          onChange={e => setActiveAuditFilter(e.target.value)}
+                          className="bg-transparent text-[10px] font-black text-blue-900 outline-none cursor-pointer pr-2 py-1"
+                        >
+                          <option value="all">Tất cả ({statsCounts.all})</option>
+                          <option value="expired">⚠️ Cần gia hạn ({statsCounts.expired})</option>
+                          <option value="unprocessed">⚙️ Đồng ý, chưa PL ({statsCounts.unaddended})</option>
+                          <option value="success">✅ Đã hoàn tất ({statsCounts.success})</option>
+                          <option value="outOfPrice">💰 Ngoài khung giá ({statsCounts.outOfPrice})</option>
+                          <option value="mismatch">⚖️ Lệch tài khoản ({statsCounts.mismatch})</option>
+                          <option value="unpaid">💸 Chưa thanh toán ({statsCounts.unpaid})</option>
+                        </select>
+                      </div>
+                    </div>
+
                     {/* Master Table */}
-                    <div className="overflow-x-auto border border-slate-100 rounded-xl max-h-[500px] overflow-y-auto">
+                    <div className="overflow-x-auto border border-slate-100 rounded-xl max-h-[500px] overflow-y-auto mt-2">
                       <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 sticky top-0 z-10">
-                          <tr className="border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                          <tr className="border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider bg-slate-100">
                             <th className="p-3 pl-4">Mã Trạm</th>
                             <th className="p-3">Tổ</th>
                             <th className="p-3">Bên Cho Thuê</th>
                             <th className="p-3">Hạn HĐ Gốc</th>
-                            <th className="p-3">Đối soát Tài Khoản nhận tiền</th>
-                            <th className="p-3">Tiến độ hồ sơ</th>
+                            <th className="p-3">Giá Đàm Phán</th>
+                            <th className="p-3">Tiến độ & Đối soát</th>
                           </tr>
                         </thead>
                         <tbody className="text-[11px] font-bold text-slate-700 divide-y divide-slate-100">
-                          {filteredSites.length === 0 ? (
+                          {paginatedSites.length === 0 ? (
                             <tr>
                               <td colSpan={6} className="text-center py-8 text-slate-400 italic">
                                 Không tìm thấy trạm nào khớp điều kiện lọc hiện hành
                               </td>
                             </tr>
                           ) : (
-                            filteredSites.map((s, index) => {
+                            paginatedSites.map((s, index) => {
                               const isSelected = s.site_id === selectedSiteId
                               const expired = isContractExpired(s)
                               const unmatchedBank = isBankAccountMismatch(s)
@@ -864,46 +718,64 @@ function doPost(e) {
                                 >
                                   {/* 1. Mã Trạm */}
                                   <td className="p-3 pl-4">
-                                    <span className="font-extrabold text-blue-600 text-xs">{s.site_id}</span>
-                                    {s.progress_tracker?.status === 'gia_han_5_nam' && (
-                                      <span className="text-amber-500 ml-1.5" title="Đã gia hạn 5 năm">🌟</span>
-                                    )}
+                                    <span className="font-extrabold text-blue-600 text-xs block">{s.site_id}</span>
+                                    <div className="mt-1 flex items-center gap-1.5">
+                                      {s.site_type && (
+                                        <span className="px-1 py-0.5 rounded text-[8px] bg-slate-100 text-slate-500 border border-slate-200 font-bold uppercase tracking-wider">
+                                          {s.site_type}
+                                        </span>
+                                      )}
+                                      {s.progress_tracker?.status === 'gia_han_5_nam' && (
+                                        <span className="text-amber-500 text-[10px] flex items-center gap-0.5 font-bold"><span title="Đã gia hạn 5 năm">🌟</span></span>
+                                      )}
+                                    </div>
                                   </td>
                                   
                                   {/* 2. Tổ */}
-                                  <td className="p-3 text-slate-500 text-[10px]">{s.to_vt || 'Chưa rõ'}</td>
+                                  <td className="p-3 text-slate-500 text-[10px] font-bold">{s.to_vt || 'Chưa rõ'}</td>
                                   
-                                  {/* 3. Bên Cho Thuê */}
-                                  <td className="p-3 text-slate-800 font-extrabold max-w-[120px] truncate">{s.owner}</td>
-                                  
+                                  {/* 3. Chủ Nhà */}
+                                  <td className="p-3 max-w-[120px]">
+                                    <div className="text-slate-800 font-extrabold text-[11px] truncate" title={s.owner}>{s.owner}</div>
+                                  </td>
+
                                   {/* 4. Hạn HĐ Gốc */}
                                   <td className="p-3">
-                                    <span>{s.end_date || 'Chưa rõ'}</span>
-                                    {expired && (
-                                      <span className="text-[9px] text-rose-500 font-black block mt-0.5">🔴 Cần Gia Hạn, Tái Ký</span>
-                                    )}
+                                    <span className="text-[10px] font-bold">{s.end_date || 'Chưa rõ'}</span>
+                                    {expired && <span className="block mt-0.5 text-[9px] text-rose-500 font-black">⚠️ Hết hạn</span>}
                                   </td>
 
-                                  {/* 5. Đối soát tài khoản */}
+                                  {/* 5. Giá & Trạng Thái Đàm Phán */}
                                   <td className="p-3">
-                                    {unmatchedBank ? (
-                                      <span className="text-[9px] bg-rose-50 text-rose-600 border border-rose-100 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5 w-max">
-                                        <AlertTriangle className="w-3 h-3 text-rose-500 shrink-0" />
-                                        {s.banking_info?.match_status_text || '⚠️ Lệch'}
-                                      </span>
+                                    {s.has_agreed_1245 ? (
+                                      <div className="flex flex-col gap-0.5">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-black">
+                                          <span className="text-slate-400 line-through">{(s.old_price / 1000000).toFixed(1)}M</span>
+                                          <span className="text-slate-300">→</span>
+                                          <span className="text-emerald-600">{(s.reduced_price! / 1000000).toFixed(1)}M</span>
+                                        </div>
+                                        {s.no_addendum_needed ? (
+                                          <span className="text-[8.5px] text-blue-500 font-black">ℹ️ Không cần PL</span>
+                                        ) : (
+                                          <span className="text-[8.5px] text-amber-500 font-black">✨ Đã đồng ý giảm</span>
+                                        )}
+                                      </div>
                                     ) : (
-                                      <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5 w-max">
-                                        <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                                        {s.banking_info?.match_status_text || '✅ Khớp'}
-                                      </span>
+                                      <div className="text-[10px] font-black text-slate-500">{(s.old_price / 1000000).toFixed(1)}M</div>
                                     )}
                                   </td>
 
-                                  {/* 6. Tiến độ hồ sơ */}
-                                  <td className="p-3">
+                                  {/* 6. Tiến độ hồ sơ & Tài khoản */}
+                                  <td className="p-3 flex flex-col items-start gap-1.5">
                                     <span className={`text-[9px] px-2 py-0.5 rounded-full border font-black ${completed ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' : currentStatusCat?.color}`}>
                                       {completed ? '✅ Đã hoàn thành' : currentStatusCat?.name}
                                     </span>
+                                    
+                                    {unmatchedBank && (
+                                      <span className="text-[8.5px] bg-rose-50 text-rose-600 border border-rose-100 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
+                                        <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" /> Lệch TK
+                                      </span>
+                                    )}
                                   </td>
                                 </tr>
                               )
@@ -911,6 +783,34 @@ function doPost(e) {
                           )}
                         </tbody>
                       </table>
+                      
+                      {/* PAGINATION CONTROLS */}
+                      {totalPages > 1 && (
+                        <div className="flex justify-between items-center px-4 py-3 bg-slate-50 border-t border-slate-200 text-xs font-medium">
+                          <span className="text-slate-500">
+                            Đang xem {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredSites.length)} / {filteredSites.length} trạm
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              disabled={currentPage === 1}
+                              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                              className="px-2.5 py-1 rounded bg-white border border-slate-200 text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
+                            >
+                              Trang trước
+                            </button>
+                            <span className="text-slate-700 font-bold bg-slate-200/50 px-3 py-1 rounded">
+                              {currentPage} / {totalPages}
+                            </span>
+                            <button
+                              disabled={currentPage === totalPages}
+                              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                              className="px-2.5 py-1 rounded bg-white border border-slate-200 text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors"
+                            >
+                              Trang sau
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -943,41 +843,56 @@ function doPost(e) {
                           </div>
                         </div>
 
-                        {/* 2. THÔNG TIN PHÂN RÃ HẠNG MỤC THUÊ (Active Price breakdown) */}
-                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 text-[11px] font-bold text-slate-600 space-y-1.5 text-left">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">🏦 Hạng mục giá thuê:</span>
-                          <div className="grid grid-cols-2 gap-y-1 gap-x-2 text-[10.5px]">
-                            {selectedSite.prices_breakdown.mb > 0 && (
-                              <div>🏢 <span className="text-slate-400 font-semibold">Mặt bằng:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.mb)}</span></div>
-                            )}
-                            {selectedSite.prices_breakdown.pm > 0 && (
-                              <div>📦 <span className="text-slate-400 font-semibold">Phòng máy:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.pm)}</span></div>
-                            )}
-                            {selectedSite.prices_breakdown.mfd > 0 && (
-                              <div>⚡ <span className="text-slate-400 font-semibold">MPĐ:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.mfd)}</span></div>
-                            )}
-                            {selectedSite.prices_breakdown.cot > 0 && (
-                              <div>🗼 <span className="text-slate-400 font-semibold">Cột anten:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.cot)}</span></div>
-                            )}
-                            {selectedSite.prices_breakdown.giam_tru !== 0 && (
-                              <div className="col-span-2 text-rose-600">📉 <span className="text-slate-400 font-semibold">Giảm trừ:</span> <span className="font-black">{formatCurrency(selectedSite.prices_breakdown.giam_tru)}</span></div>
-                            )}
-                          </div>
-                          <div className="border-t border-slate-200 pt-1.5 mt-1.5 flex justify-between items-center text-xs">
-                            <span className="text-slate-500 font-extrabold">Đơn giá gốc:</span>
-                            <span className="text-slate-800 font-black">{formatCurrency(selectedSite.old_price)}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-emerald-600 font-extrabold">Giá sau đàm phán:</span>
-                            <span className="text-emerald-600 font-black">{formatCurrency(selectedSite.new_price)}</span>
-                          </div>
-                          
-                          {(selectedSite.no_addendum_needed || (selectedSite.old_price > 0 && selectedSite.new_price > 0 && selectedSite.old_price < selectedSite.new_price)) && (
-                            <div className="mt-2.5 p-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-[9.5px] font-black leading-relaxed flex items-start gap-1.5 animate-pulse">
-                              <span className="text-indigo-500">ℹ️</span>
-                              <span>Trạm không cần làm phụ lục giảm giá (Giá hiện tại HT &lt;= Giá mục tiêu MT).</span>
+                        {/* 2. THÔNG TIN GIÁ THUÊ (SO SÁNH KHUNG VÀ THỰC TẾ) */}
+                        <div className="flex flex-col gap-2">
+                          {/* KHUNG GIÁ YÊU CẦU */}
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 text-[11px] font-bold text-slate-600 space-y-1.5 text-left">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">🏦 HẠNG MỤC GIÁ THUÊ (YÊU CẦU):</span>
+                            <div className="grid grid-cols-2 gap-y-1 gap-x-2 text-[10.5px]">
+                              {selectedSite.prices_breakdown.mb > 0 && (
+                                <div>🏢 <span className="text-slate-400 font-semibold">Mặt bằng:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.mb)}</span></div>
+                              )}
+                              {selectedSite.prices_breakdown.pm > 0 && (
+                                <div>📦 <span className="text-slate-400 font-semibold">Phòng máy:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.pm)}</span></div>
+                              )}
+                              {selectedSite.prices_breakdown.mfd > 0 && (
+                                <div>⚡ <span className="text-slate-400 font-semibold">MPĐ:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.mfd)}</span></div>
+                              )}
+                              {selectedSite.prices_breakdown.cot > 0 && (
+                                <div>🗼 <span className="text-slate-400 font-semibold">Cột anten:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.cot)}</span></div>
+                              )}
+                              {selectedSite.prices_breakdown.giam_tru !== 0 && (
+                                <div className="col-span-2 text-rose-600">📉 <span className="text-slate-400 font-semibold">Giảm trừ:</span> <span className="font-black">{formatCurrency(selectedSite.prices_breakdown.giam_tru)}</span></div>
+                              )}
                             </div>
-                          )}
+                          </div>
+
+                          {/* GIÁ ĐÃ THOẢ THUẬN */}
+                          <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100 text-[11px] font-bold text-slate-600 space-y-1.5 text-left">
+                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">🤝 KẾT QUẢ ĐÀM PHÁN:</span>
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-slate-500 font-extrabold">Đơn giá gốc:</span>
+                              <span className="text-slate-800 font-black">{formatCurrency(selectedSite.old_price)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs mt-1">
+                              <span className="text-emerald-600 font-extrabold">Giá sau đàm phán:</span>
+                              <span className="text-emerald-600 font-black">{formatCurrency(selectedSite.new_price)}</span>
+                            </div>
+                            
+                            {(selectedSite.no_addendum_needed || (selectedSite.old_price > 0 && selectedSite.new_price > 0 && selectedSite.old_price <= selectedSite.new_price)) && (
+                              <div className="mt-2.5 p-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-[9.5px] font-black leading-relaxed flex items-start gap-1.5 animate-pulse">
+                                <span className="text-indigo-500">ℹ️</span>
+                                <span>Trạm không cần làm phụ lục giảm giá (Giá hiện tại HT &lt;= Giá mục tiêu MT).</span>
+                              </div>
+                            )}
+
+                            {(selectedSite.reached_target && (selectedSite.reached_target.toLowerCase().includes('không') || selectedSite.reached_target.toLowerCase().includes('chưa'))) && (
+                              <div className="mt-2.5 p-2 bg-rose-50 border border-rose-100 text-rose-700 rounded-lg text-[9.5px] font-black leading-relaxed flex items-start gap-1.5">
+                                <span className="text-rose-500">⚠️</span>
+                                <span>Trạm đàm phán CHƯA ĐẠT MỤC TIÊU. Không đủ điều kiện xuất phụ lục giảm giá.</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {/* 3. THÔNG TIN ĐỐI SOÁT TÀI KHOẢN BANK */}
@@ -1105,7 +1020,7 @@ function doPost(e) {
                       {/* TIẾN TRÌNH TRÌNH KÝ CHECKLIST */}
                       <div className="space-y-1.5 pt-2 border-t border-slate-100 text-left">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                          📋 4. Checklist tiến độ đã xử lý:
+                          📋 4. Checklist tiến độ {(editStatus === 'can_thanh_ly' || editStatus === 'gia_han_5_nam') ? 'Hợp Đồng Mới' : 'Phụ Lục Giảm Giá'}:
                         </span>
                         <div className="grid grid-cols-2 gap-2">
                           <button 
@@ -1113,7 +1028,7 @@ function doPost(e) {
                             className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${selectedSite.progress_tracker.progress.draft_prepared ? 'bg-emerald-50/50 border-emerald-300 text-emerald-800' : 'bg-slate-50 border-slate-200'}`}
                           >
                             <span className="text-[9px] text-slate-400 font-extrabold uppercase">Bước 1</span>
-                            <span className="text-[10px] font-extrabold text-slate-800 mt-1">Đã soạn Word</span>
+                            <span className="text-[10px] font-extrabold text-slate-800 mt-1">Đã soạn {(editStatus === 'can_thanh_ly' || editStatus === 'gia_han_5_nam') ? 'Word HĐ' : 'Word PL'}</span>
                           </button>
 
                           <button 
@@ -1121,7 +1036,7 @@ function doPost(e) {
                             className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${selectedSite.progress_tracker.progress.submitted_internal ? 'bg-emerald-50/50 border-emerald-300 text-emerald-800' : 'bg-slate-50 border-slate-200'}`}
                           >
                             <span className="text-[9px] text-slate-400 font-extrabold uppercase">Bước 2</span>
-                            <span className="text-[10px] font-extrabold text-slate-800 mt-1">Đã Trình Ký</span>
+                            <span className="text-[10px] font-extrabold text-slate-800 mt-1">Trình Ký {(editStatus === 'can_thanh_ly' || editStatus === 'gia_han_5_nam') ? 'HĐ' : 'PL'}</span>
                           </button>
 
                           <button 

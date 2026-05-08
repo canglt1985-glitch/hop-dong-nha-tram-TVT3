@@ -1,15 +1,37 @@
 {
-  "project": "BTS Contract Automation",
-  "current_feature": "Đồng bộ hóa công thức tính giá, làm tròn 3 lớp và bệ Shelter cho Thanh lý ký lại",
-  "current_task": "Đồng bộ hóa generate_thanh_ly_contract.py và main.py với bộ xử lý chuẩn, test thành công trạm có shelter (BPHQ55) và push git",
-  "status": "Hoàn thành 100%",
-  "progress_percent": 100,
-  "last_action": "Đồng bộ hóa, chạy thử nghiệm thành công 100% thẻ Table 1 và Push code lên GitHub repo",
-  "next_step": "Vận hành và xuất hợp đồng thực tế cho người dùng",
+  "updated_at": "2026-05-08T10:04:00Z",
   "working_on": {
-    "feature": "Đồng bộ hóa công thức tính giá, làm tròn 3 lớp và bệ Shelter cho Thanh lý ký lại",
-    "status": "running",
-    "last_run": "2026-05-07T13:00:00+07:00",
-    "last_run_url": "http://localhost:5173"
-  }
+    "feature": "Thanh_Ly_Ky_Lai Document Generation",
+    "task": "Sửa lỗi overlap bảng chữ ký, khớp hạng mục CSHT với bảng giá, cập nhật thẻ {{END_DATE}}",
+    "status": "completed",
+    "files": [
+      "backend/cloud_document_generator.py",
+      "templates/THANH LY KY LAI_TEMPLATE.docx"
+    ],
+    "blockers": [],
+    "notes": "Đã đổi {{PAID_UNTIL_DATE}} thành {{END_DATE}} ở 2 đoạn cam kết trong tờ trình thanh lý theo yêu cầu."
+  },
+  "pending_tasks": [],
+  "recent_changes": [
+    {
+      "timestamp": "2026-05-08T10:04:00Z",
+      "type": "feature",
+      "description": "Cập nhật danh sách CSHT (Phòng MFĐ, Phòng máy mặt đất...) khớp 100% với tên hạng mục trong bảng giá",
+      "files": ["backend/cloud_document_generator.py"]
+    },
+    {
+      "timestamp": "2026-05-08T10:04:00Z",
+      "type": "bugfix",
+      "description": "Chèn ngắt trang (Page Break) vào sau bảng chữ ký biên bản thanh lý để không bị lấn sang Hợp đồng mới",
+      "files": ["templates/THANH LY KY LAI_TEMPLATE.docx"]
+    },
+    {
+      "timestamp": "2026-05-08T10:04:00Z",
+      "type": "feature",
+      "description": "Đổi tag thanh toán đến hết ngày thành {{END_DATE}} (Ngày kết thúc hợp đồng cũ) trong Thanh lý ký lại",
+      "files": ["templates/THANH LY KY LAI_TEMPLATE.docx"]
+    }
+  ],
+  "errors_encountered": [],
+  "decisions_made": []
 }

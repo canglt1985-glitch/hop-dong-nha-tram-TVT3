@@ -14,6 +14,11 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, Optional, List
 
+from utils.data_utils import parse_numeric_value, find_header_indices
+from services.sync_service import fetch_online_progress, sync_post_to_google_sheet_async
+from utils.pricing_utils import calculate_pricing_breakdown
+from word_service import WordService
+
 # Add the parent directory to Python path to import generate_thanh_ly_contract if needed
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -76,79 +81,6 @@ def save_progress(progress_data: Dict):
     except Exception as e:
         print(f"Error saving progress: {e}")
 
-def parse_numeric_value(val) -> float:
-    if pd.isna(val):
-        return 0.0
-    if isinstance(val, (int, float)):
-        return float(val)
-    val_str = str(val).strip()
-    if not val_str:
-        return 0.0
-    try:
-        # Remove common currency symbols, spaces
-        val_str = val_str.replace("đ", "").replace("VND", "").replace(" ", "").replace("\xa0", "").strip()
-        # Handle Vietnamese formatting where '.' is thousands and ',' is decimal
-        if "." in val_str and "," in val_str:
-            val_str = val_str.replace(".", "").replace(",", ".")
-        elif "." in val_str:
-            parts = val_str.split(".")
-            if len(parts) > 2 or (len(parts) == 2 and len(parts[1]) == 3):
-                val_str = val_str.replace(".", "")
-            else:
-                pass
-        elif "," in val_str:
-            val_str = val_str.replace(",", ".")
-        return float(val_str)
-    except Exception:
-        return 0.0
-
-
-# --- ONLINE SYNC MECHANISM ---
-def fetch_online_progress(web_app_url: str) -> Optional[Dict]:
-    """Fetches the latest progress data from the Google Sheets via Apps Script Web App."""
-    if not web_app_url or not web_app_url.strip():
-        return None
-    try:
-        response = requests.get(web_app_url, timeout=5)
-        if response.status_code == 200:
-            online_rows = response.json()
-            # Convert list of rows back to site_id dictionary
-            online_dict = {}
-            for row in online_rows:
-                site_id = row.get("site_id")
-                if site_id:
-                    online_dict[site_id] = {
-                        "selected_template": row.get("selected_template", "thanh_ly_ky_lai"),
-                        "status": row.get("status", "dong_y"),
-                        "new_contract_no": row.get("new_contract_no", ""),
-                        "new_contract_date": row.get("new_contract_date", ""),
-                        "new_price_confirmed": float(row["new_price_confirmed"]) if row.get("new_price_confirmed") else None,
-                        "progress": {
-                            "draft_prepared": row.get("draft_prepared") == "TRUE",
-                            "submitted_internal": row.get("submitted_internal") == "TRUE",
-                            "signed_and_stamped": row.get("signed_and_stamped") == "TRUE",
-                            "archived_doc": row.get("archived_doc") == "TRUE"
-                        },
-                        "last_updated": row.get("last_updated", datetime.now().isoformat())
-                    }
-            return online_dict
-    except Exception as e:
-        print(f"Warning: Failed to fetch online progress from Web App: {e}")
-    return None
-
-def sync_post_to_google_sheet_async(web_app_url: str, payload: Dict):
-    """Sends progress update to Google Sheets Web App in a background thread."""
-    def run():
-        if not web_app_url or not web_app_url.strip():
-            return
-        try:
-            headers = {"Content-Type": "application/json"}
-            requests.post(web_app_url, data=json.dumps(payload), headers=headers, timeout=10)
-            print("Successfully synced progress record to Google Sheets online!")
-        except Exception as e:
-            print(f"Error syncing to Google Sheets: {e}")
-    threading.Thread(target=run, daemon=True).start()
-
 # --- PYDANTIC SCHEMAS ---
 class ProgressUpdate(BaseModel):
     site_id: str
@@ -162,53 +94,6 @@ class ProgressUpdate(BaseModel):
 class SettingsUpdate(BaseModel):
     spreadsheet_id: str
     web_app_url: str
-
-# --- DYNAMIC COLUMN INDEX FINDER ---
-def find_header_indices(df: pd.DataFrame) -> Dict[str, int]:
-    """
-    Scans Row index 6 (Row 7 in spreadsheet) for exact and fuzzy matching header terms
-    to prevent index shifting issues between Google Sheets and local Excel.
-    """
-    headers = [str(x).strip().lower() if pd.notna(x) else "" for x in df.iloc[6]]
-    
-    # Defaults based on standard Excel layout
-    mapping = {
-        "site_id": 1,          # 'Mã trạm'
-        "owner": 16,           # 'Chủ thể hợp đồng'
-        "end_date": 26,        # 'Ngày kết thúc HĐ'
-        "payment_cycle": 70,   # 'Chu kỳ thanh toán'
-        "account_owner": 87,   # 'Chủ tài khoản'
-        "account_no": 88,      # 'Số tài khoản'
-        "bank_name": 89,       # 'Ngân hàng'
-        "bank_branch": 90,     # 'Chi nhánh'
-        "to_vt": 91,           # 'Tổ'
-        "dat_muc_tieu_1245": 11, # 'Đạt mục tiêu 1245 (trước đàm phán)'
-        "duoc_thanh_toan_1245": 12 # 'Được thanh toán theo 1245'
-    }
-    
-    # Try to scan and update mapping dynamically
-    for idx, h in enumerate(headers):
-        if "mã trạm" in h or h == "id trạm":
-            mapping["site_id"] = idx
-        elif "chủ thể hợp đồng" in h or "bên cho thuê" in h or h == "chủ nhà":
-            mapping["owner"] = idx
-        elif "ngày kết thúc hđ" in h or h == "hạn hợp đồng":
-            mapping["end_date"] = idx
-        elif "chu kỳ thanh toán" in h or h == "chu kỳ":
-            mapping["payment_cycle"] = idx
-        elif "đạt mục tiêu 1245" in h:
-            mapping["dat_muc_tieu_1245"] = idx
-        elif "được thanh toán theo 1245" in h:
-            mapping["duoc_thanh_toan_1245"] = idx
-        elif "chủ tài khoản" in h:
-            mapping["account_owner"] = idx
-            # Bank details are strictly sequential following account_owner
-            mapping["account_no"] = idx + 1
-            mapping["bank_name"] = idx + 2
-            mapping["bank_branch"] = idx + 3
-            mapping["to_vt"] = idx + 4
-
-    return mapping
 
 # --- API ENDPOINTS ---
 
@@ -229,12 +114,28 @@ def update_settings(data: SettingsUpdate):
     save_config(config)
     return {"success": True, "settings": config}
 
+import time
+
+# --- CACHE ---
+SITE_CACHE = {
+    "data": None,
+    "last_fetched": 0
+}
+CACHE_TTL = 1800  # 30 minutes
+
 @app.get("/sites")
-def get_sites():
+def get_sites(force_refresh: bool = False):
     """
     Loads sites from Google Sheets directly (online master data), 
     falling back to local DATA HOP DONG.xlsx if offline.
     """
+    global SITE_CACHE
+    
+    if not force_refresh and SITE_CACHE["data"] is not None:
+        if time.time() - SITE_CACHE["last_fetched"] < CACHE_TTL:
+            print("Returning sites from cache...")
+            return SITE_CACHE["data"]
+
     config = load_config()
     spreadsheet_id = config.get("spreadsheet_id", "19fmCxjIiY0g0bj823-QpThXL8UyYeZKAdBoCyeodv1g")
     web_app_url = config.get("web_app_url", "")
@@ -244,12 +145,13 @@ def get_sites():
     
     # 1. Attempt to load master data online from Google Sheets (Public CSV Export)
     if spreadsheet_id:
-        url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:csv&sheet=hopdong"
+        url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid=0"
         try:
             print(f"Fetching master contract data from Google Sheet: {url}")
             response = requests.get(url, timeout=5)
             if response.status_code == 200:
-                df = pd.read_csv(io.StringIO(response.text), header=None)
+                response.encoding = 'utf-8'
+                df = pd.read_csv(io.StringIO(response.text), header=None, dtype=str)
                 loaded_online = True
                 print(f"Successfully loaded {df.shape[0]} rows online from Google Sheets!")
         except Exception as e:
@@ -261,7 +163,7 @@ def get_sites():
             raise HTTPException(status_code=404, detail="Master data source not found (Google Sheets offline and local Excel missing).")
         try:
             print("Loading master contract data from local Excel file...")
-            df = pd.read_excel(EXCEL_PATH, sheet_name="FULL-(XHH-LK)", header=None)
+            df = pd.read_excel(EXCEL_PATH, sheet_name="FULL-(XHH-LK)", header=None, dtype=str)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error reading local Excel fallback: {str(e)}")
 
@@ -273,7 +175,8 @@ def get_sites():
             print(f"Fetching VB1245 data from Google Sheet: {url_vb}")
             response_vb = requests.get(url_vb, timeout=5)
             if response_vb.status_code == 200:
-                df_vb = pd.read_csv(io.StringIO(response_vb.text), header=None)
+                response_vb.encoding = 'utf-8'
+                df_vb = pd.read_csv(io.StringIO(response_vb.text), header=None, dtype=str)
                 # Starts from row 7 (index 7)
                 for r in range(7, df_vb.shape[0]):
                     v_id_val = df_vb.iloc[r, 1]
@@ -282,31 +185,55 @@ def get_sites():
                         val_5 = str(df_vb.iloc[r, 5]).strip() if pd.notna(df_vb.iloc[r, 5]) else ""
                         val_9 = str(df_vb.iloc[r, 9]).strip() if pd.notna(df_vb.iloc[r, 9]) else ""
                         val_16 = str(df_vb.iloc[r, 16]).strip() if pd.notna(df_vb.iloc[r, 16]) else ""
-                        val_89 = str(df_vb.iloc[r, 89]).strip() if pd.notna(df_vb.iloc[r, 89]) else ""
-                        val_90 = str(df_vb.iloc[r, 90]).strip() if pd.notna(df_vb.iloc[r, 90]) else ""
-                        val_91 = str(df_vb.iloc[r, 91]).strip() if pd.notna(df_vb.iloc[r, 91]) else ""
+                        val_80 = str(df_vb.iloc[r, 80]).strip() if pd.notna(df_vb.iloc[r, 80]) else ""
+                        val_81 = str(df_vb.iloc[r, 81]).strip() if pd.notna(df_vb.iloc[r, 81]) else ""
+                        val_82 = str(df_vb.iloc[r, 82]).strip() if pd.notna(df_vb.iloc[r, 82]) else ""
                         val_95 = str(df_vb.iloc[r, 95]).strip() if pd.notna(df_vb.iloc[r, 95]) else ""
                         val_96 = str(df_vb.iloc[r, 96]).strip() if pd.notna(df_vb.iloc[r, 96]) else ""
                         
                         ht_price = parse_numeric_value(val_5)
                         mt_price = parse_numeric_value(val_9)
-                        reduction_amount = parse_numeric_value(val_91)
+                        reduction_amount = parse_numeric_value(val_81)
                         reduced_price = parse_numeric_value(val_95)
                         
-                        # Has agreed is True if cols 89, 90, 91 are filled and valid
+                        # Has agreed is True if cols 80 (CC) is 'x' OR 81 (CD) has value OR 82 (CE) has value
                         has_agreed = False
-                        if val_89 and val_90 and val_91 and val_89 != "-" and val_90 != "-" and val_91 != "-":
+                        if val_80.lower() == 'x' or (val_81 and val_81 not in ['-', 'nan']) or (val_82 and val_82 not in ['-', 'nan']):
                             has_agreed = True
+                        
+                        # Extract pricing breakdown from VB1245
+                        mb_raw = parse_numeric_value(df_vb.iloc[r, 42])
+                        pm_raw = max([parse_numeric_value(df_vb.iloc[r, c]) for c in range(43, 49)] + [0.0])
+                        mfd_raw = parse_numeric_value(df_vb.iloc[r, 50])
+                        cot_raw = max([parse_numeric_value(df_vb.iloc[r, c]) for c in range(51, 54)] + [0.0])
+                        giam_tru_raw = parse_numeric_value(df_vb.iloc[r, 62])
+                        
+                        # Fix large values in thousands if necessary (if value is > 0 and < 10000, usually it means it's in 1k units)
+                        if 0 < abs(mb_raw) < 10000: mb_raw *= 1000
+                        if 0 < abs(pm_raw) < 10000: pm_raw *= 1000
+                        if 0 < abs(mfd_raw) < 10000: mfd_raw *= 1000
+                        if 0 < abs(cot_raw) < 10000: cot_raw *= 1000
+                        if 0 < abs(giam_tru_raw) < 10000: giam_tru_raw *= 1000
+                        
+                        cot_rounded = round(cot_raw / 1000) * 1000
                         
                         vb_map[v_id] = {
                             "has_agreed_1245": has_agreed,
                             "ht_price": ht_price,
                             "mt_price": mt_price,
-                            "negotiation_date": val_89,
-                            "effective_date": val_90,
+                            "negotiation_date": val_80,
+                            "effective_date": val_81,
                             "reduction_amount": reduction_amount,
                             "reduced_price": reduced_price,
-                            "reached_target": val_96
+                            "reached_target": "", # Will be dynamically calculated later
+                            "prices_breakdown": {
+                                "mb": mb_raw,
+                                "pm": pm_raw,
+                                "mfd": mfd_raw,
+                                "cot": cot_raw,
+                                "giam_tru": giam_tru_raw,
+                                "cot_rounded": cot_rounded
+                            }
                         }
                 print(f"Successfully loaded and parsed {len(vb_map)} VB1245 site mappings!")
         except Exception as e:
@@ -337,6 +264,25 @@ def get_sites():
                 continue
                 
             owner_name = str(df.iloc[r_idx, col_map["owner"]]).strip() if pd.notna(df.iloc[r_idx, col_map["owner"]]) else "Chưa rõ"
+            
+            # Additional mapped fields
+            contact_addr = str(df.iloc[r_idx, col_map.get("contact_addr", 17)]).strip() if "contact_addr" in col_map and pd.notna(df.iloc[r_idx, col_map["contact_addr"]]) else ""
+            contract_no = str(df.iloc[r_idx, col_map.get("contract_no", 24)]).strip() if "contract_no" in col_map and pd.notna(df.iloc[r_idx, col_map["contract_no"]]) else ""
+            phone = str(df.iloc[r_idx, col_map.get("phone", 12)]).strip() if "phone" in col_map and pd.notna(df.iloc[r_idx, col_map["phone"]]) else ""
+            
+            address_old = str(df.iloc[r_idx, col_map.get("address_old", 35)]).strip() if "address_old" in col_map and pd.notna(df.iloc[r_idx, col_map["address_old"]]) else ""
+            address_new = str(df.iloc[r_idx, col_map.get("address_new", 41)]).strip() if "address_new" in col_map and pd.notna(df.iloc[r_idx, col_map["address_new"]]) else ""
+            if address_new and address_new != "nan" and "Đồng Nai" not in address_new:
+                address_new += ", Đồng Nai"
+            
+            contract_date_val = df.iloc[r_idx, col_map["contract_date"]] if "contract_date" in col_map else None
+            contract_date_str = ""
+            if pd.notna(contract_date_val):
+                if isinstance(contract_date_val, datetime):
+                    contract_date_str = contract_date_val.strftime("%d/%m/%Y")
+                else:
+                    contract_date_str = str(contract_date_val).strip()
+            
             end_date_val = df.iloc[r_idx, col_map["end_date"]]
             
             # Format expiry date
@@ -345,18 +291,18 @@ def get_sites():
             if pd.notna(end_date_val):
                 if isinstance(end_date_val, datetime):
                     end_date_str = end_date_val.strftime("%d/%m/%Y")
-                    needs_ext = end_date_val < datetime(2027, 7, 1)
+                    needs_ext = end_date_val < datetime(2026, 7, 1)
                 else:
                     end_date_str = str(end_date_val).strip()
                     # Try to parse string dates
                     try:
                         parsed_dt = datetime.strptime(end_date_str, "%d/%m/%Y")
-                        needs_ext = parsed_dt < datetime(2027, 7, 1)
+                        needs_ext = parsed_dt < datetime(2026, 7, 1)
                     except ValueError:
                         try:
                             parsed_dt = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
                             end_date_str = parsed_dt.strftime("%d/%m/%Y")
-                            needs_ext = parsed_dt < datetime(2027, 7, 1)
+                            needs_ext = parsed_dt < datetime(2026, 7, 1)
                         except ValueError:
                             # Fuzzy fallbacks
                             needs_ext = "2026" in end_date_str or "2025" in end_date_str or "2024" in end_date_str
@@ -365,6 +311,9 @@ def get_sites():
                 needs_ext = True
                     
             ext_status = "🔴 Cần gia hạn" if needs_ext else "🟢 Còn hạn"
+            
+            site_type_val = str(df.iloc[r_idx, col_map.get("site_type", 8)]).strip() if "site_type" in col_map else ""
+            site_type = site_type_val if site_type_val and site_type_val.lower() != "nan" else ""
             
             # Robust extraction of old_price
             old_price = parse_numeric_value(df.iloc[r_idx, 43])
@@ -376,91 +325,7 @@ def get_sites():
             # Apply column index offset of +1 if loaded online from Google Sheets (due to a blank col at index 42)
             offset = 1 if loaded_online else 0
             
-            # --- HARMONIZED PRICING EXTRACTION (Indices 47 to 67) ---
-            mb_raw = parse_numeric_value(df.iloc[r_idx, 47 + offset])
-            
-            # Room/Shelter types dynamic scanning (Indices 48 to 54)
-            pm_raw = 0.0
-            pm_label_val = "Phòng máy mặt đất"
-            for col_i in range(48, 55):
-                val = parse_numeric_value(df.iloc[r_idx, col_i + offset])
-                if val > 0:
-                    pm_raw = val
-                    try:
-                        title = str(df.iloc[6, col_i + offset]).strip()
-                        if title and title.lower() != 'nan':
-                            pm_label_val = title.capitalize()
-                    except Exception:
-                        pass
-                    break
-                    
-            # Generator Room (Index 55)
-            mfd_raw = parse_numeric_value(df.iloc[r_idx, 55 + offset])
-            
-            # Tower types dynamic scanning (Indices 56 to 58)
-            cot_raw = 0.0
-            for col_i in range(56, 59):
-                val = parse_numeric_value(df.iloc[r_idx, col_i + offset])
-                if val > 0:
-                    cot_raw = val
-                    break
-                    
-            # Shared Tower Discount (Index 67)
-            giam_tru_raw = parse_numeric_value(df.iloc[r_idx, 67 + offset])
-            
-            # Google Sheets might export small numbers representing thousands (e.g., 300.0 instead of 300000)
-            if loaded_online:
-                if 0 < abs(mb_raw) < 10000: mb_raw *= 1000
-                if 0 < abs(pm_raw) < 10000: pm_raw *= 1000
-                if 0 < abs(mfd_raw) < 10000: mfd_raw *= 1000
-                if 0 < abs(cot_raw) < 10000: cot_raw *= 1000
-                if 0 < abs(giam_tru_raw) < 10000: giam_tru_raw *= 1000
-                
-            # Auxiliary Extra Items scanning (Indices 59 to 66)
-            other_items = []
-            other_items_raw_total = 0.0
-            other_items_pay_total = 0.0
-            for col_i in range(59, 67):
-                val = parse_numeric_value(df.iloc[r_idx, col_i + offset])
-                if val > 0:
-                    if loaded_online and 0 < abs(val) < 10000:
-                        val *= 1000
-                    raw_val = val
-                    pay_val = (int(raw_val) // 50000) * 50000
-                    try:
-                        title = str(df.iloc[6, col_i + offset]).strip()
-                    except Exception:
-                        title = ""
-                    if not title or title.lower() == 'nan':
-                        title = f"Hạng mục Index {col_i}"
-                    other_items.append({
-                        "title": title.capitalize(),
-                        "raw": raw_val,
-                        "pay": pay_val
-                    })
-                    other_items_raw_total += raw_val
-                    other_items_pay_total += pay_val
-                    
-            # --- 3-LAYER ROUNDING MATHS (Unified with VB1245) ---
-            # Layer 1: Round Antenna Tower price including negative sharing discounts
-            cot_price_pay = ((int(cot_raw) + int(giam_tru_raw)) // 50000) * 50000
-            
-            # Layer 2: Temporary sum rounded down to nearest 50,000 for standard compliance
-            temp_total = mb_raw + pm_raw + mfd_raw + cot_price_pay + other_items_raw_total
-            new_price_val = (int(temp_total) // 50000) * 50000
-            
-            # Layer 3: Round room/generator prices and plug the remaining portion into Mặt bằng
-            pm_price_pay = (int(pm_raw) // 50000) * 50000 if pm_raw > 0 else 0
-            mfd_price_pay = (int(mfd_raw) // 50000) * 50000 if mfd_raw > 0 else 0
-            mb_price_pay = new_price_val - pm_price_pay - mfd_price_pay - cot_price_pay - other_items_pay_total
-            
-            mb_price = mb_price_pay
-            pm_price = pm_price_pay
-            mfd_price = mfd_price_pay
-            cot_price = cot_raw
-            giam_tru = giam_tru_raw
-            
-            # Retrieve VB1245 specific details
+            # Retrieve VB1245 specific details first so we can use its pricing
             vb_info = vb_map.get(site_id, {})
             has_agreed_vb = vb_info.get("has_agreed_1245", False)
             ht_price_vb = vb_info.get("ht_price", 0)
@@ -470,6 +335,28 @@ def get_sites():
             reached_target_vb = vb_info.get("reached_target", "")
             negotiation_date_vb = vb_info.get("negotiation_date", "")
             effective_date_vb = vb_info.get("effective_date", "")
+            prices_vb = vb_info.get("prices_breakdown", {})
+            
+            # Default fetch from hopdong sheet for fallback and other_items
+            prices, new_price_val, other_items = calculate_pricing_breakdown(df, r_idx, offset, loaded_online)
+            mb_price = prices['mb']
+            pm_price = prices['pm']
+            mfd_price = prices['mfd']
+            cot_price = prices['cot']
+            giam_tru = prices['giam_tru']
+            cot_price_pay = prices['cot_rounded']
+            
+            # Since the user requested the price breakdown to be taken from VB1245 sheet, we override with prices_vb.
+            if prices_vb:
+                mb_price = prices_vb.get("mb", 0)
+                pm_price = prices_vb.get("pm", 0)
+                mfd_price = prices_vb.get("mfd", 0)
+                cot_price = prices_vb.get("cot", 0)
+                giam_tru = prices_vb.get("giam_tru", 0)
+                cot_price_pay = prices_vb.get("cot_rounded", 0)
+                # Recompute new_price_val based on VB1245 values + other_items
+                new_price_val = mb_price + pm_price + mfd_price + cot_price_pay + giam_tru + sum(item['pay'] for item in other_items)
+
             
             # Determine if price addendum is even needed (HT <= MT)
             no_addendum_needed = False
@@ -479,17 +366,28 @@ def get_sites():
             # Smart determination of new_price
             if site_id in progress_data and progress_data[site_id].get("new_price_confirmed"):
                 new_price = int(progress_data[site_id]["new_price_confirmed"])
-            elif has_agreed_vb and reduced_price_vb > 0:
+            elif reduced_price_vb > 0:
                 new_price = int(reduced_price_vb)
-            elif has_agreed_vb and reduction_amount_vb > 0:
+            elif reduction_amount_vb > 0:
                 new_price = int(old_price - reduction_amount_vb)
             else:
                 # Fallback to calculated new price from elements
                 elem_price = int(new_price_val)
                 new_price = elem_price if elem_price > 0 else int(old_price)
+                
+            # Compute reached_target dynamically!
+            if new_price > 0 and new_price_val > 0:
+                if new_price <= new_price_val:
+                    reached_target_vb = "Đạt"
+                else:
+                    reached_target_vb = "Không đạt"
+            else:
+                reached_target_vb = "Chưa đàm phán"
+
             
             # Extracted details for payment cycles and bank compliance
             payment_cycle = str(df.iloc[r_idx, col_map["payment_cycle"]]).strip() if pd.notna(df.iloc[r_idx, col_map["payment_cycle"]]) else "6 tháng"
+            paid_until_date = str(df.iloc[r_idx, col_map["paid_until_date"]]).strip() if "paid_until_date" in col_map and pd.notna(df.iloc[r_idx, col_map["paid_until_date"]]) else ""
             account_owner = str(df.iloc[r_idx, col_map["account_owner"]]).strip() if pd.notna(df.iloc[r_idx, col_map["account_owner"]]) else owner_name
             account_no = str(df.iloc[r_idx, col_map["account_no"]]).strip() if pd.notna(df.iloc[r_idx, col_map["account_no"]]) else ""
             bank_name = str(df.iloc[r_idx, col_map["bank_name"]]).strip() if pd.notna(df.iloc[r_idx, col_map["bank_name"]]) else ""
@@ -536,7 +434,14 @@ def get_sites():
             sites_list.append({
                 "site_id": site_id,
                 "owner": owner_name,
+                "contact_addr": contact_addr,
+                "phone": phone,
+                "contract_no": contract_no,
+                "contract_date": contract_date_str,
+                "address_old": address_old,
+                "address_new": address_new,
                 "end_date": end_date_str,
+                "paid_until_date": paid_until_date,
                 "ext_status": ext_status,
                 "old_price": old_price,
                 "new_price": new_price,
@@ -559,6 +464,7 @@ def get_sites():
                 },
                 "payment_cycle": payment_cycle,
                 "to_vt": to_vt,  # Organization/Operations Group VT1/2/3/4/5
+                "site_type": site_type, # HTCS, MBF, VNPT...
                 "banking_info": {
                     "account_owner": account_owner,
                     "account_no": account_no,
@@ -570,6 +476,9 @@ def get_sites():
                 "progress_tracker": prog_info
             })
             
+        SITE_CACHE["data"] = sites_list
+        SITE_CACHE["last_fetched"] = time.time()
+        
         return sites_list
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error compiling contract lists: {str(e)}")
@@ -598,125 +507,100 @@ def update_progress(data: ProgressUpdate):
         
     return {"success": True, "data": progress_data[data.site_id], "synced_online": bool(web_app_url)}
 
+def _vn_currency_words(amount: int) -> str:
+    """Convert a positive integer VND amount to Vietnamese words."""
+    ones = ['', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín']
+    def _group(n, zero_lead):
+        h, rem = divmod(n, 100)
+        t, u = divmod(rem, 10)
+        parts = []
+        if h: parts.append(ones[h] + ' trăm')
+        if t == 1:
+            parts.append('mười' if u == 0 else f'mười {ones[u]}')
+        elif t > 1:
+            parts.append(f'{ones[t]} mươi' + (f' {ones[u]}' if u else ''))
+        elif u and (h or zero_lead):
+            parts.append(f'lẻ {ones[u]}')
+        elif u:
+            parts.append(ones[u])
+        return ' '.join(parts)
+    
+    if amount == 0: return 'không đồng'
+    result = []
+    billions, remainder = divmod(abs(amount), 10**9)
+    if billions: result.append(f'{_group(billions, False)} tỷ')
+    millions, remainder = divmod(remainder, 10**6)
+    if millions: result.append(f'{_group(millions, bool(billions))} triệu')
+    thousands, remainder = divmod(remainder, 10**3)
+    if thousands: result.append(f'{_group(thousands, bool(billions or millions))} nghìn')
+    if remainder: result.append(_group(remainder, True))
+    return ' '.join(result) + ' đồng'
+
+def _fmt(n) -> str:
+    """Format number as Vietnamese currency string (dot-separated)."""
+    try: return f"{int(n):,}".replace(",", ".")
+    except: return "0"
+
 @app.post("/generate/{site_id}")
 def generate_document(site_id: str, template_type: str = Body(..., embed=True)):
     """Triggers dynamic docx generation for a specific site & template type."""
     site_id = site_id.upper()
     print(f"Generating docx for: {site_id} with template {template_type}")
-    
-    if template_type == "thanh_ly_ky_lai":
-        from generate_thanh_ly_contract import generate_thanh_ly_contract
+
+    def _save_progress(tpl_type, filename):
+        progress_data = load_progress()
+        if site_id not in progress_data:
+            progress_data[site_id] = {
+                "selected_template": tpl_type,
+                "status": "dong_y",
+                "new_contract_no": "",
+                "new_contract_date": "",
+                "new_price_confirmed": None,
+                "progress": {"draft_prepared": True, "submitted_internal": False, "signed_and_stamped": False, "archived_doc": False}
+            }
+        else:
+            if "progress" not in progress_data[site_id]:
+                progress_data[site_id]["progress"] = {}
+            progress_data[site_id]["progress"]["draft_prepared"] = True
+            progress_data[site_id]["selected_template"] = tpl_type
+        progress_data[site_id]["last_updated"] = datetime.now().isoformat()
+        save_progress(progress_data)
+        config = load_config()
+        web_app_url = config.get("web_app_url", "")
+        if web_app_url:
+            sync_post_to_google_sheet_async(web_app_url, {site_id: progress_data[site_id]})
+        return progress_data[site_id]
+
+    if template_type in ["thanh_ly_ky_lai", "phu_luc_giam_gia", "phu_luc_gia_han"]:
+        from cloud_document_generator import generate_document_from_cloud
         try:
-            success = generate_thanh_ly_contract(site_id)
+            sites = get_sites()
+            site_data = next((s for s in sites if s["site_id"] == site_id), None)
+            if not site_data:
+                raise HTTPException(status_code=404, detail=f"Không tìm thấy dữ liệu cho trạm {site_id}")
+                
+            if template_type == "thanh_ly_ky_lai":
+                tpl_name = "THANH LY KY LAI_TEMPLATE.docx"
+                prefix = "Thanh_Ly_Ky_Lai"
+            elif template_type == "phu_luc_giam_gia":
+                tpl_name = "MASTER_TEMPLATE_VFINAL.docx"
+                prefix = "Phu_Luc_Giam_Gia"
+            else:
+                tpl_name = "MASTER_TEMPLATE_VFINAL.docx"
+                prefix = "Phu_Luc_Gia_Han"
+                
+            template_path = os.path.join(WORKSPACE_DIR, "templates", tpl_name)
+            
+            success, out_filename_or_err = generate_document_from_cloud(site_data, template_path, OUTPUT_DIR, prefix)
             if success:
-                # Update progress tracker to check draft_prepared = True
-                progress_data = load_progress()
-                if site_id not in progress_data:
-                    progress_data[site_id] = {
-                        "selected_template": template_type,
-                        "status": "dong_y",
-                        "new_contract_no": "",
-                        "new_contract_date": "",
-                        "new_price_confirmed": None,
-                        "progress": {
-                            "draft_prepared": True,
-                            "submitted_internal": False,
-                            "signed_and_stamped": False,
-                            "archived_doc": False
-                        }
-                    }
-                else:
-                    progress_data[site_id]["progress"]["draft_prepared"] = True
-                    progress_data[site_id]["selected_template"] = template_type
-                
-                progress_data[site_id]["last_updated"] = datetime.now().isoformat()
-                save_progress(progress_data)
-                
-                # Dynamic background sync to Google Sheet
-                config = load_config()
-                web_app_url = config.get("web_app_url", "")
-                if web_app_url:
-                    sync_post_to_google_sheet_async(web_app_url, {site_id: progress_data[site_id]})
-                
-                output_path = os.path.join(OUTPUT_DIR, f"Thanh_Ly_Ky_Lai_{site_id}.docx")
-                if os.path.exists(output_path):
-                    return {"success": True, "filename": f"Thanh_Ly_Ky_Lai_{site_id}.docx", "progress": progress_data[site_id]}
-                else:
-                    raise HTTPException(status_code=500, detail="Output file was not found on disk after successful generation.")
-            else:
-                raise HTTPException(status_code=500, detail="Document generation process returned False.")
+                prog = _save_progress(template_type, out_filename_or_err)
+                return {"success": True, "filename": out_filename_or_err, "progress": prog}
+            raise HTTPException(status_code=500, detail=f"Lỗi khởi tạo tài liệu: {out_filename_or_err}")
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-            
-    elif template_type in ["phu_luc_giam_gia", "phu_luc_gia_han"]:
-        import batch_processor as bp
-        import pandas as pd
-        import shutil
-        
-        try:
-            print("Loading master lists for Phụ lục generation...")
-            df_master = pd.read_excel(bp.MASTER_EXCEL)
-            df_price = pd.read_excel(bp.PRICE_EXCEL, sheet_name='Chi tiết thuê trạm', header=None)
-            
-            # Find the row index matching site_id (which is in column index 2 of master Excel)
-            row_idx = None
-            for r in range(df_master.shape[0]):
-                cell_val = df_master.iloc[r, 2]
-                if pd.notna(cell_val) and str(cell_val).strip().upper() == site_id:
-                    row_idx = r
-                    break
-                    
-            if row_idx is None:
-                raise HTTPException(status_code=404, detail=f"Không tìm thấy trạm {site_id} trong danh sách Master để soạn Phụ lục.")
-                
-            row = df_master.iloc[row_idx]
-            
-            # Create batch output folder if not exists
-            if not os.path.exists(bp.O_DIR):
-                os.makedirs(bp.O_DIR)
-                
-            success, out_file = bp.process_site(row, df_price)
-            if success and out_file and os.path.exists(out_file):
-                # Update progress tracker
-                progress_data = load_progress()
-                if site_id not in progress_data:
-                    progress_data[site_id] = {
-                        "selected_template": template_type,
-                        "status": "dong_y",
-                        "new_contract_no": "",
-                        "new_contract_date": "",
-                        "new_price_confirmed": None,
-                        "progress": {
-                            "draft_prepared": True,
-                            "submitted_internal": False,
-                            "signed_and_stamped": False,
-                            "archived_doc": False
-                        }
-                    }
-                else:
-                    progress_data[site_id]["progress"]["draft_prepared"] = True
-                    progress_data[site_id]["selected_template"] = template_type
-                
-                progress_data[site_id]["last_updated"] = datetime.now().isoformat()
-                save_progress(progress_data)
-                
-                # Dynamic background sync to Google Sheet
-                config = load_config()
-                web_app_url = config.get("web_app_url", "")
-                if web_app_url:
-                    sync_post_to_google_sheet_async(web_app_url, {site_id: progress_data[site_id]})
-                
-                # Determine destination file name based on type
-                dest_filename = f"Phu_Luc_Giam_Gia_{site_id}.docx" if template_type == "phu_luc_giam_gia" else f"Phu_Luc_Gia_Han_{site_id}.docx"
-                dest_path = os.path.join(OUTPUT_DIR, dest_filename)
-                shutil.copy(out_file, dest_path)
-                
-                return {"success": True, "filename": dest_filename, "progress": progress_data[site_id]}
-            else:
-                raise HTTPException(status_code=500, detail=f"Lỗi khởi tạo tài liệu từ động cơ batch: {out_file}")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-            
+
     else:
         raise HTTPException(status_code=501, detail=f"Template workflow '{template_type}' is registered but not yet implemented.")
 
