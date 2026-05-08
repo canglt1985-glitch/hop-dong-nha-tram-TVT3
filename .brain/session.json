@@ -1,37 +1,55 @@
 {
-  "updated_at": "2026-05-08T10:04:00Z",
+  "updated_at": "2026-05-08T04:18:00Z",
   "working_on": {
-    "feature": "Thanh_Ly_Ky_Lai Document Generation",
-    "task": "Sửa lỗi overlap bảng chữ ký, khớp hạng mục CSHT với bảng giá, cập nhật thẻ {{END_DATE}}",
+    "feature": "Deploy & Performance",
+    "task": "Deploy Firebase Hosting & Resolve Caching/Pagination",
     "status": "completed",
     "files": [
-      "backend/cloud_document_generator.py",
-      "templates/THANH LY KY LAI_TEMPLATE.docx"
+      "backend/main.py",
+      "frontend/src/App.tsx",
+      "frontend/firebase.json"
     ],
     "blockers": [],
-    "notes": "Đã đổi {{PAID_UNTIL_DATE}} thành {{END_DATE}} ở 2 đoạn cam kết trong tờ trình thanh lý theo yêu cầu."
+    "notes": "Frontend is deployed on Firebase Hosting. Backend is running locally on port 8000. Need to setup Cloudflare Tunnel or Render to expose Backend API."
   },
-  "pending_tasks": [],
-  "recent_changes": [
+  "pending_tasks": [
     {
-      "timestamp": "2026-05-08T10:04:00Z",
-      "type": "feature",
-      "description": "Cập nhật danh sách CSHT (Phòng MFĐ, Phòng máy mặt đất...) khớp 100% với tên hạng mục trong bảng giá",
-      "files": ["backend/cloud_document_generator.py"]
-    },
-    {
-      "timestamp": "2026-05-08T10:04:00Z",
-      "type": "bugfix",
-      "description": "Chèn ngắt trang (Page Break) vào sau bảng chữ ký biên bản thanh lý để không bị lấn sang Hợp đồng mới",
-      "files": ["templates/THANH LY KY LAI_TEMPLATE.docx"]
-    },
-    {
-      "timestamp": "2026-05-08T10:04:00Z",
-      "type": "feature",
-      "description": "Đổi tag thanh toán đến hết ngày thành {{END_DATE}} (Ngày kết thúc hợp đồng cũ) trong Thanh lý ký lại",
-      "files": ["templates/THANH LY KY LAI_TEMPLATE.docx"]
+      "task": "Setup Backend API Tunnel or Deploy to Render",
+      "priority": "high",
+      "notes": "Firebase Hosting frontend cannot access localhost:8000."
     }
   ],
-  "errors_encountered": [],
-  "decisions_made": []
+  "recent_changes": [
+    {
+      "timestamp": "2026-05-08",
+      "type": "feature",
+      "description": "Implemented SITE_CACHE in backend/main.py to prevent Google Sheets N+1 timeout",
+      "files": ["backend/main.py"]
+    },
+    {
+      "timestamp": "2026-05-08",
+      "type": "feature",
+      "description": "Added Pagination logic (30 items/page) to frontend App.tsx",
+      "files": ["frontend/src/App.tsx"]
+    },
+    {
+      "timestamp": "2026-05-08",
+      "type": "deploy",
+      "description": "Deployed frontend to Firebase Hosting tvt3-hdnt.web.app",
+      "files": ["frontend/firebase.json", "frontend/.firebaserc"]
+    }
+  ],
+  "errors_encountered": [
+    {
+      "error": "Syntax Error missing </div> in App.tsx",
+      "solution": "Added missing closing div to the table wrapper",
+      "resolved": true
+    }
+  ],
+  "decisions_made": [
+    {
+      "decision": "Use Firebase Hosting for frontend, keep backend local for now",
+      "reason": "Firebase Functions Python is hard for docx generation and user wanted quick internal testing"
+    }
+  ]
 }
