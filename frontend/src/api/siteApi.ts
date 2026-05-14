@@ -21,6 +21,7 @@ export const fetchSites = async (forceRefresh: boolean = false) => {
   return res.json();
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const updateProgress = async (payload: any) => {
   const res = await fetch('/api/progress', {
     method: 'POST',

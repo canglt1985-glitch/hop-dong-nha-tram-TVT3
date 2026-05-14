@@ -47,7 +47,8 @@ def find_header_indices(df: pd.DataFrame) -> Dict[str, int]:
         "to_vt": 91,           # 'Tổ'
         "dat_muc_tieu_1245": 11, # 'Đạt mục tiêu 1245 (trước đàm phán)'
         "duoc_thanh_toan_1245": 12, # 'Được thanh toán theo 1245'
-        "site_type": 8         # 'HTCS/ MBF/ VNPT'
+        "site_type": 8,         # 'HTCS/ MBF/ VNPT'
+        "hs_phap_ly": 42        # 'Hồ sơ pháp lý'
     }
     
     # Try to scan and update mapping dynamically
@@ -58,10 +59,12 @@ def find_header_indices(df: pd.DataFrame) -> Dict[str, int]:
             mapping["owner"] = idx
         elif "ngày kết thúc hđ" in h or h == "hạn hợp đồng":
             mapping["end_date"] = idx
-        elif "chu kỳ thanh toán" in h or h == "chu kỳ":
-            mapping["payment_cycle"] = idx
         elif "đã thanh toán đến ngày" in h:
             mapping["paid_until_date"] = idx
+        elif "chu kỳ thanh toán" in h or h == "chu kỳ thanh toán":
+            mapping["payment_cycle"] = idx
+        elif "hồ sơ pháp lý" in h or "pháp lý" in h:
+            mapping["hs_phap_ly"] = idx
         elif "đạt mục tiêu 1245" in h:
             mapping["dat_muc_tieu_1245"] = idx
         elif "được thanh toán theo 1245" in h:

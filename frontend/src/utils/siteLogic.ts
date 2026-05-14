@@ -70,3 +70,92 @@ export const isUnpaid = (site: Site) => {
   return site.progress_tracker?.status !== 'da_gui_thanh_toan';
 };
 
+export const calculateAlignedCycles = (startDateStr: string, cycleMonths: number, termYears: number, monthlyPrice: number) => {
+  const [day, month, year] = startDateStr.split('/').map(Number);
+  const startDate = new Date(year, month - 1, day);
+  
+  if (isNaN(startDate.getTime())) return null;
+
+  // 1. Calculate Contract End Date (Standardized logic)
+  const isExactMonthStart = day === 1;
+  const endYear = year + termYears;
+  
+  let finalContractEnd: Date;
+  if (isExactMonthStart) {
+    // Ví dụ: Bắt đầu 01/06/2026 -> 5 năm sau kết thúc 31/05/2031 (Tròn 60 tháng)
+    finalContractEnd = new Date(endYear, month - 1, 0); 
+  } else {
+    // Ví dụ: Bắt đầu 09/04/2026 -> 5 năm sau kết thúc 30/04/2031 (60 tháng + ngày lẻ)
+    finalContractEnd = new Date(endYear, month, 0);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cycles: any[] = [];
+  
+  // Cycle 1: Align to end of month after cycleMonths
+  // Logic: 
+  // - Nếu bắt đầu ngày 1: Kỳ 1 tròn cycleMonths (VD: 01/05 -> 31/10)
+  // - Nếu bắt đầu ngày lẻ: Kỳ 1 = ngày lẻ + cycleMonths (VD: 09/04 -> 31/10)
+  const c1EndMonthIndex = isExactMonthStart ? (month - 1 + cycleMonths - 1) : (month - 1 + cycleMonths);
+  const c1EndDate = new Date(year, c1EndMonthIndex + 1, 0); // Last day of month
+
+  // Calculate Cycle 1 Price
+  const daysInStartMonth = new Date(year, month, 0).getDate();
+  const daysWorkedInStartMonth = daysInStartMonth - day + 1;
+  
+  let c1Total = 0;
+  if (isExactMonthStart) {
+    c1Total = Math.round(monthlyPrice * cycleMonths);
+  } else {
+    const c1PricePartial = (monthlyPrice / 30) * daysWorkedInStartMonth;
+    const c1PriceFull = monthlyPrice * cycleMonths;
+    c1Total = Math.round(c1PricePartial + c1PriceFull);
+  }
+  
+  cycles.push({
+    index: 1,
+    start: startDateStr,
+    end: c1EndDate.toLocaleDateString('en-GB'),
+    amount: c1Total,
+    is_partial: true
+  });
+  
+  // Subsequent Cycles: Start from next day, exactly cycleMonths
+  let nextStart = new Date(c1EndDate);
+  nextStart.setDate(nextStart.getDate() + 1);
+  
+  let idx = 2;
+  while (nextStart < finalContractEnd) {
+    const targetEndMonthIndex = nextStart.getMonth() + cycleMonths - 1;
+    let cEndDate = new Date(nextStart.getFullYear(), targetEndMonthIndex + 1, 0);
+    
+    let cTotal = monthlyPrice * cycleMonths;
+    
+    // Check if we exceed contract end
+    if (cEndDate > finalContractEnd) {
+      cEndDate = new Date(finalContractEnd);
+      // Calculate months diff
+      const monthsDiff = (cEndDate.getFullYear() - nextStart.getFullYear()) * 12 + (cEndDate.getMonth() - nextStart.getMonth()) + 1;
+      cTotal = monthlyPrice * monthsDiff;
+    }
+    
+    cycles.push({
+      index: idx,
+      start: nextStart.toLocaleDateString('en-GB'),
+      end: cEndDate.toLocaleDateString('en-GB'),
+      amount: Math.round(cTotal),
+      is_partial: false
+    });
+    
+    nextStart = new Date(cEndDate);
+    nextStart.setDate(nextStart.getDate() + 1);
+    idx++;
+  }
+  
+  return {
+    startDate: startDateStr,
+    endDate: finalContractEnd.toLocaleDateString('en-GB'),
+    cycles
+  };
+};
+

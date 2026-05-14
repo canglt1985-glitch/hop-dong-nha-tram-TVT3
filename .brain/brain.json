@@ -11,7 +11,7 @@
   "tech_stack": {
     "frontend": {
       "framework": "React + Vite",
-      "styling": "Tailwind CSS",
+      "styling": "Vanilla CSS + Tailwind CSS",
       "hosting": "Firebase Hosting"
     },
     "backend": {
@@ -24,7 +24,7 @@
     {
       "path": "/sites",
       "method": "GET",
-      "explained": "Lấy danh sách 1500+ trạm từ Google Sheets (Có Cache 30 phút)"
+      "explained": "Lấy danh sách 1500+ trạm từ Google Sheets (Có Cache 30 phút). Trích xuất thêm Hồ sơ pháp lý (cột 42) và VHKT (cột 61)."
     },
     {
       "path": "/progress",
@@ -34,23 +34,25 @@
     {
       "path": "/generate/{site_id}",
       "method": "POST",
-      "explained": "Tự động sinh file Word hợp đồng/phụ lục cho trạm"
-    },
-    {
-      "path": "/download/{filename}",
-      "method": "GET",
-      "explained": "Tải file Word đã sinh về máy"
+      "explained": "Sinh file Word. Hỗ trợ tính toán VHKT (600k), tự động phân luồng MBF (Gia hạn) vs CSHT (Thanh lý ký lại). Tự động ngắt trang trước chữ ký."
     }
   ],
   "business_rules": [
-    "Trước 30/06/2026: Làm Phụ Lục Giảm Giá. Sau 30/06/2026: Thanh Lý Ký Lại.",
-    "Bảng giá thuê gồm: Mặt bằng, Phòng máy, Máy phát điện, Cột anten.",
-    "Danh sách trạm được lưu bằng Cache để tối ưu tải trang."
+    "Thời hạn hợp đồng: Luôn 5 năm, kết thúc vào ngày cuối cùng của tháng (Ví dụ: 09/04/2026 -> 30/04/2031).",
+    "Chu kỳ thanh toán (Kỳ 1): Nếu bắt đầu ngày 1 -> Kỳ 1 tròn 6 tháng. Nếu bắt đầu ngày lẻ -> Kỳ 1 = Phần ngày lẻ + 6 tháng trọn vẹn.",
+    "Hạng mục VHKT (Bảo vệ, hỗ trợ VHKT, PCCC) có giá 600,000đ, được tách riêng và làm tròn 50k.",
+    "Trạm MobiFone (MBF) dùng template MẶT BẰNG, các trạm khác dùng template CSHT.",
+    "Hồ sơ pháp lý (cột 42) được dùng làm 'Căn cứ' trong hợp đồng qua tag {{CERTIFICATE}} và {{LEGAL_DOCS}}.",
+    "Bảng giá CSHT được ghim cứng đoạn mô tả tiêu chuẩn MobiFone cho thiết bị/máy nổ/anten.",
+    "Tự động ngắt trang (Page Break) trước phần ký tên trong file Word để tránh chồng lấn bảng biểu."
   ],
   "features": [
-    "Đọc dữ liệu từ Google Sheets",
-    "Hiển thị danh sách và lọc theo Tổ VT / Trạng thái",
-    "Tạo file Word tự động theo Template",
-    "Lưu tiến độ đàm phán"
+    "Đọc dữ liệu từ Google Sheets (Master + VB1245)",
+    "Tự động tính toán phân rã đơn giá (Mặt bằng, VHKT, Thuế)",
+    "Logic ngày tháng chuẩn hóa (5 năm, cuối tháng, dồn ngày lẻ kỳ 1)",
+    "Phân luồng thông minh biểu mẫu theo Site Type",
+    "Tự động điền căn cứ hồ sơ pháp lý và ngắt trang thông minh",
+    "Lưu tiến độ và đồng bộ đám mây",
+    "Khung kiểm thử tự động (Pytest) và chuẩn hóa Template Word động"
   ]
 }

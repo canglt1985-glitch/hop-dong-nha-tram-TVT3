@@ -1,22 +1,24 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState, useMemo } from 'react'
 import { 
   FileText, Loader2, Search, 
   Download, Layers, 
   ChevronDown, Settings, BarChart2, 
-  AlertTriangle, Filter, Copy, ExternalLink, RefreshCw
+  AlertTriangle, Filter, Copy, ExternalLink, RefreshCw, Calendar
 } from 'lucide-react'
 
 import { fetchSettings, updateSettings, fetchSites, updateProgress, generateDocument } from './api/siteApi';
-import { formatCurrency, isContractExpired, isCompleted, isPriceAddendumPending, isBankAccountMismatch, matchToVt, isOutOfPriceRange, isUnpaid } from './utils/siteLogic';
+import { formatCurrency, isContractExpired, isCompleted, isPriceAddendumPending, isBankAccountMismatch, matchToVt, isOutOfPriceRange, isUnpaid, calculateAlignedCycles } from './utils/siteLogic';
 import type { Site } from './types/site';
 
 // --- BIỂU MẪU ĐĂNG KÝ (TEMPLATES REGISTRATION) ---
 const TEMPLATE_CONFIGS = [
-  { id: 'thanh_ly_ky_lai', name: 'Gia Hạn, Tái Ký (5 Năm Chuẩn)', ready: true },
-  { id: 'phu_luc_giam_gia', name: 'Phụ Lục Giảm Giá Đơn Giá', ready: true },
-  { id: 'phu_luc_gia_han', name: 'Phụ Lục Gia Hạn Thời Gian', ready: true },
-  { id: 'thanh_ly_ky_moi', name: 'Gia Hạn, Tái Ký Mới (Đổi Chủ)', ready: false },
-  { id: 'ky_moi', name: 'Hợp Đồng Ký Mới Hoàn Toàn', ready: false }
+  { id: 'phu_luc_giam_gia', name: '1. Phụ lục giảm giá đơn giá', ready: true },
+  { id: 'phu_luc_gia_han', name: '2. Phụ lục gia hạn thời gian', ready: true },
+  { id: 'phu_luc_giam_gia_gia_han', name: '3. Phụ lục giảm giá & gia hạn (5 năm)', ready: true },
+  { id: 'thanh_ly_ky_lai', name: '4. Phụ lục thanh lý, ký lại (5 năm)', ready: true },
+  { id: 'thanh_ly_ky_moi', name: '5. Phụ lục thanh lý, ký mới (đổi chủ thể)', ready: false },
+  { id: 'ky_moi_hop_dong', name: '6. Ký mới hợp đồng hoàn toàn', ready: false }
 ];
 
 // --- TRẠNG THÁI TIẾN ĐỘ HỒ SƠ (PROGRESS STATUS CATEGORIES) ---
@@ -84,7 +86,7 @@ function App() {
     fetchSitesList()
   }, [])
 
-  const fetchSitesList = (forceRefresh: boolean = false) => {
+  function fetchSitesList(forceRefresh: boolean = false) {
     setLoading(true)
     fetchSites(forceRefresh)
       .then((data: Site[]) => {
@@ -114,7 +116,9 @@ function App() {
       // Auto-suggest Logic (Trước 30/06/2026 -> Hợp đồng mới | Sau -> Phụ lục)
       const isExpiringSoon = isContractExpired(selectedSite)
       const suggestedStatus = isExpiringSoon ? 'can_thanh_ly' : 'dong_y'
-      let defaultTemplate = isExpiringSoon ? 'thanh_ly_ky_lai' : 'phu_luc_giam_gia'
+      const isMbf = (selectedSite.site_type || '').toUpperCase().includes('MBF')
+      const defaultExtTemplate = isMbf ? 'phu_luc_gia_han' : 'thanh_ly_ky_lai'
+      let defaultTemplate = isExpiringSoon ? defaultExtTemplate : 'phu_luc_giam_gia'
 
       if (isSaved) {
         setEditStatus(selectedSite.progress_tracker?.status || suggestedStatus)
@@ -140,6 +144,43 @@ function App() {
       )
     }
   }, [selectedSite])
+  
+  // Tính toán chu kỳ thanh toán dựa trên logic mới (Cân đối ngày lẻ vào Kỳ 1)
+  const alignedPaymentCycles = useMemo(() => {
+    if (!selectedSite || !newPriceConfirmed || isNaN(parseFloat(newPriceConfirmed))) return null;
+    
+    // Logic: Ngày bắt đầu HĐ mới = Ngày sau ngày hết hạn cũ
+    let startDateStr = '';
+    try {
+      if (selectedSite.end_date) {
+        let expDate: Date;
+        if (selectedSite.end_date.includes('/')) {
+          const [d, m, y] = selectedSite.end_date.split('/').map(Number);
+          expDate = new Date(y, m - 1, d);
+        } else {
+          // Assume ISO YYYY-MM-DD
+          expDate = new Date(selectedSite.end_date);
+        }
+        
+        if (!isNaN(expDate.getTime())) {
+          expDate.setDate(expDate.getDate() + 1);
+          startDateStr = expDate.toLocaleDateString('en-GB');
+        } else {
+          startDateStr = '01/01/2026';
+        }
+      } else {
+        startDateStr = '01/01/2026';
+      }
+    } catch {
+      startDateStr = '01/01/2026';
+    }
+
+    const cycleMonths = 6; 
+    const termYears = 5;   
+    const monthlyPrice = parseFloat(newPriceConfirmed);
+    
+    return calculateAlignedCycles(startDateStr, cycleMonths, termYears, monthlyPrice);
+  }, [selectedSite, newPriceConfirmed]);
 
 
   // Thống kê số lượng (Có thể áp dụng filter Tổ VT động để nhìn số liệu cực kỳ trực quan)
@@ -222,8 +263,14 @@ function App() {
 
       // 2b. Lọc theo Loại Trạm (HTCS, MBF, v.v.)
       if (activeTypeFilter !== 'all') {
-        const t = (s.site_type || '').toUpperCase()
-        if (!t.includes(activeTypeFilter.toUpperCase())) return false
+        const siteType = (s.site_type || '').toUpperCase()
+        const filterType = activeTypeFilter.toUpperCase()
+        
+        // Smart match: MBF matches MOBIFONE
+        const isMbfMatch = (filterType === 'MBF' && (siteType.includes('MBF') || siteType.includes('MOBIFONE')))
+        const isOtherMatch = siteType.includes(filterType)
+        
+        if (!(isMbfMatch || isOtherMatch)) return false
       }
 
       // 3. Lọc theo từ khóa tìm kiếm (Mã trạm, tên chủ trạm, chủ tài khoản)
@@ -895,6 +942,57 @@ function doPost(e) {
                           </div>
                         </div>
 
+
+                        
+                        {/* 3b. CHU KỲ THANH TOÁN DỰ KIẾN (HIỂN THỊ RÕ NÉT) */}
+                        {alignedPaymentCycles && (
+                          <div className="bg-white p-4 rounded-2xl border-2 border-blue-100 shadow-xl space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-blue-50">
+                              <span className="text-[11px] font-black text-blue-800 uppercase tracking-widest flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-blue-600" />
+                                Chu kỳ thanh toán dự kiến
+                              </span>
+                              <span className="text-[10px] font-black text-white bg-blue-600 px-3 py-1 rounded-full shadow-sm">
+                                End: {alignedPaymentCycles.endDate}
+                              </span>
+                            </div>
+                            
+                            <div className="max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+                              <table className="w-full text-left border-separate border-spacing-y-1.5">
+                                <thead>
+                                  <tr className="text-[10px] font-black text-slate-400 uppercase border-b border-slate-100">
+                                    <th className="pb-2 pl-1">Kỳ</th>
+                                    <th className="pb-2">Thời gian thanh toán</th>
+                                    <th className="pb-2 text-right">Số tiền dự kiến</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="text-[10.5px]">
+                                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                  {alignedPaymentCycles.cycles.map((cycle: any) => (
+                                    <tr key={cycle.index} className={`group ${cycle.is_partial ? 'bg-indigo-50 border-2 border-indigo-200' : 'bg-slate-50 border border-slate-100'} rounded-xl overflow-hidden hover:scale-[1.01] transition-all`}>
+                                      <td className="p-3 rounded-l-xl font-black text-slate-500 group-hover:text-blue-700">
+                                        #{cycle.index}
+                                      </td>
+                                      <td className="p-3 font-bold text-slate-700">
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className="text-[11px] text-slate-900">{cycle.start}</span>
+                                          <span className="text-[9px] text-slate-400 font-bold">đến {cycle.end}</span>
+                                        </div>
+                                      </td>
+                                      <td className="p-3 rounded-r-xl text-right font-black text-slate-900 text-[11.5px]">
+                                        {formatCurrency(cycle.amount)}
+                                        {cycle.is_partial && (
+                                          <div className="text-[8px] text-indigo-500 font-black uppercase mt-0.5">Kỳ lẻ dồn</div>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
                         {/* 3. THÔNG TIN ĐỐI SOÁT TÀI KHOẢN BANK */}
                         <div className={`p-3 rounded-xl border text-xs font-bold space-y-1 text-left ${selectedSite.banking_info?.is_owner_match ? 'bg-emerald-50/50 border-emerald-200 text-emerald-800' : 'bg-rose-50/50 border-rose-200 text-rose-800'}`}>
                           <div className="font-black text-[10.5px]">
@@ -922,11 +1020,13 @@ function doPost(e) {
                               onChange={(e) => setEditTemplate(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-200 text-xs font-black text-slate-700 rounded-xl px-3 py-2.5 appearance-none focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm focus:bg-white"
                             >
-                              {TEMPLATE_CONFIGS.map(t => (
-                                <option key={t.id} value={t.id}>
-                                  {t.name} {!t.ready && '(Đang phát triển)'}
-                                </option>
-                              ))}
+                              {TEMPLATE_CONFIGS.map(t => {
+                                return (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name} {!t.ready && '(Đang phát triển)'}
+                                  </option>
+                                );
+                              })}
                             </select>
                             <ChevronDown className="absolute right-3.5 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
                           </div>
@@ -1067,8 +1167,8 @@ function doPost(e) {
                         <div className="flex gap-1.5">
                           <button
                             onClick={handleGenerate}
-                            disabled={generating || !['thanh_ly_ky_lai', 'phu_luc_giam_gia', 'phu_luc_gia_han'].includes(editTemplate)}
-                            className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm ${['thanh_ly_ky_lai', 'phu_luc_giam_gia', 'phu_luc_gia_han'].includes(editTemplate) ? 'bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95 shadow-emerald-500/10' : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200/50'}`}
+                            disabled={generating || !['thanh_ly_ky_lai', 'phu_luc_giam_gia', 'phu_luc_gia_han', 'phu_luc_giam_gia_gia_han'].includes(editTemplate)}
+                            className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm ${['thanh_ly_ky_lai', 'phu_luc_giam_gia', 'phu_luc_gia_han', 'phu_luc_giam_gia_gia_han'].includes(editTemplate) ? 'bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95 shadow-emerald-500/10' : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200/50'}`}
                           >
                             {generating ? 'Đang tạo...' : 'Sinh Tệp Word'}
                           </button>

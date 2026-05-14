@@ -207,13 +207,15 @@ def get_sites(force_refresh: bool = False):
                         mfd_raw = parse_numeric_value(df_vb.iloc[r, 50])
                         cot_raw = max([parse_numeric_value(df_vb.iloc[r, c]) for c in range(51, 54)] + [0.0])
                         giam_tru_raw = parse_numeric_value(df_vb.iloc[r, 62])
+                        vhkt_raw = parse_numeric_value(df_vb.iloc[r, 61])
                         
-                        # Fix large values in thousands if necessary (if value is > 0 and < 10000, usually it means it's in 1k units)
+                        # Fix large values in thousands if necessary
                         if 0 < abs(mb_raw) < 10000: mb_raw *= 1000
                         if 0 < abs(pm_raw) < 10000: pm_raw *= 1000
                         if 0 < abs(mfd_raw) < 10000: mfd_raw *= 1000
                         if 0 < abs(cot_raw) < 10000: cot_raw *= 1000
                         if 0 < abs(giam_tru_raw) < 10000: giam_tru_raw *= 1000
+                        if 0 < abs(vhkt_raw) < 10000: vhkt_raw *= 1000
                         
                         cot_rounded = round(cot_raw / 1000) * 1000
                         
@@ -232,7 +234,8 @@ def get_sites(force_refresh: bool = False):
                                 "mfd": mfd_raw,
                                 "cot": cot_raw,
                                 "giam_tru": giam_tru_raw,
-                                "cot_rounded": cot_rounded
+                                "cot_rounded": cot_rounded,
+                                "vhkt": vhkt_raw
                             }
                         }
                 print(f"Successfully loaded and parsed {len(vb_map)} VB1245 site mappings!")
@@ -274,6 +277,8 @@ def get_sites(force_refresh: bool = False):
             address_new = str(df.iloc[r_idx, col_map.get("address_new", 41)]).strip() if "address_new" in col_map and pd.notna(df.iloc[r_idx, col_map["address_new"]]) else ""
             if address_new and address_new != "nan" and "Đồng Nai" not in address_new:
                 address_new += ", Đồng Nai"
+                
+            hs_phap_ly = str(df.iloc[r_idx, col_map.get("hs_phap_ly", 42)]).strip() if "hs_phap_ly" in col_map and pd.notna(df.iloc[r_idx, col_map["hs_phap_ly"]]) else ""
             
             contract_date_val = df.iloc[r_idx, col_map["contract_date"]] if "contract_date" in col_map else None
             contract_date_str = ""
@@ -345,6 +350,7 @@ def get_sites(force_refresh: bool = False):
             cot_price = prices['cot']
             giam_tru = prices['giam_tru']
             cot_price_pay = prices['cot_rounded']
+            vhkt_price = prices.get('vhkt', 0)
             
             # Since the user requested the price breakdown to be taken from VB1245 sheet, we override with prices_vb.
             if prices_vb:
@@ -354,8 +360,9 @@ def get_sites(force_refresh: bool = False):
                 cot_price = prices_vb.get("cot", 0)
                 giam_tru = prices_vb.get("giam_tru", 0)
                 cot_price_pay = prices_vb.get("cot_rounded", 0)
+                vhkt_price = prices_vb.get("vhkt", 0)
                 # Recompute new_price_val based on VB1245 values + other_items
-                new_price_val = mb_price + pm_price + mfd_price + cot_price_pay + giam_tru + sum(item['pay'] for item in other_items)
+                new_price_val = mb_price + pm_price + mfd_price + cot_price_pay + vhkt_price + sum(item['pay'] for item in other_items)
 
             
             # Determine if price addendum is even needed (HT <= MT)
@@ -395,6 +402,7 @@ def get_sites(force_refresh: bool = False):
             to_vt = str(df.iloc[r_idx, col_map["to_vt"]]).strip() if pd.notna(df.iloc[r_idx, col_map["to_vt"]]) else "Chưa rõ"
             dat_muc_tieu_1245 = str(df.iloc[r_idx, col_map["dat_muc_tieu_1245"]]).strip() if pd.notna(df.iloc[r_idx, col_map["dat_muc_tieu_1245"]]) else ""
             duoc_thanh_toan_1245 = str(df.iloc[r_idx, col_map["duoc_thanh_toan_1245"]]).strip() if pd.notna(df.iloc[r_idx, col_map["duoc_thanh_toan_1245"]]) else ""
+            hs_phap_ly = str(df.iloc[r_idx, col_map["hs_phap_ly"]]).strip() if "hs_phap_ly" in col_map and pd.notna(df.iloc[r_idx, col_map["hs_phap_ly"]]) else ""
 
             # Match checking: check if the bank account name matches the landlord name
             is_owner_match = owner_name.lower().strip() in account_owner.lower().strip() or account_owner.lower().strip() in owner_name.lower().strip()
@@ -409,8 +417,11 @@ def get_sites(force_refresh: bool = False):
                 default_status = "dong_y"  # If not agreed and not expired, it defaults to active contract (reducing price workflow)
 
             # Fetch progress if any
+            is_mbf = "MBF" in str(site_type).upper()
+            default_ext_template = "phu_luc_gia_han" if is_mbf else "thanh_ly_ky_lai"
+            
             prog_info = progress_data.get(site_id, {
-                "selected_template": "thanh_ly_ky_lai" if needs_ext else "phu_luc_giam_gia",
+                "selected_template": default_ext_template if needs_ext else "phu_luc_giam_gia",
                 "status": default_status,
                 "new_contract_no": "",
                 "new_contract_date": "",
@@ -440,6 +451,7 @@ def get_sites(force_refresh: bool = False):
                 "contract_date": contract_date_str,
                 "address_old": address_old,
                 "address_new": address_new,
+                "hs_phap_ly": hs_phap_ly,
                 "end_date": end_date_str,
                 "paid_until_date": paid_until_date,
                 "ext_status": ext_status,
@@ -460,7 +472,8 @@ def get_sites(force_refresh: bool = False):
                     "mfd": mfd_price,
                     "cot": cot_price,
                     "giam_tru": giam_tru,
-                    "cot_rounded": cot_price_pay
+                    "cot_rounded": cot_price_pay,
+                    "vhkt": vhkt_price
                 },
                 "payment_cycle": payment_cycle,
                 "to_vt": to_vt,  # Organization/Operations Group VT1/2/3/4/5
@@ -571,7 +584,7 @@ def generate_document(site_id: str, template_type: str = Body(..., embed=True)):
             sync_post_to_google_sheet_async(web_app_url, {site_id: progress_data[site_id]})
         return progress_data[site_id]
 
-    if template_type in ["thanh_ly_ky_lai", "phu_luc_giam_gia", "phu_luc_gia_han"]:
+    if template_type in ["thanh_ly_ky_lai", "phu_luc_giam_gia", "phu_luc_gia_han", "phu_luc_giam_gia_gia_han", "thanh_ly_ky_moi", "ky_moi_hop_dong"]:
         from cloud_document_generator import generate_document_from_cloud
         try:
             sites = get_sites()
@@ -579,19 +592,37 @@ def generate_document(site_id: str, template_type: str = Body(..., embed=True)):
             if not site_data:
                 raise HTTPException(status_code=404, detail=f"Không tìm thấy dữ liệu cho trạm {site_id}")
                 
-            if template_type == "thanh_ly_ky_lai":
-                tpl_name = "THANH LY KY LAI_TEMPLATE.docx"
-                prefix = "Thanh_Ly_Ky_Lai"
-            elif template_type == "phu_luc_giam_gia":
-                tpl_name = "MASTER_TEMPLATE_VFINAL.docx"
+            site_type_val = str(site_data.get("site_type", "")).strip().upper()
+            # Only MBF gets MAT_BANG template
+            is_mbf = "MBF" in site_type_val or "MOBIFONE" in site_type_val
+            suffix = "_MAT_BANG.docx" if is_mbf else "_CSHT.docx"
+            
+            # Mapping logic based on user request
+            if template_type == "phu_luc_giam_gia":
+                tpl_name = f"PHU_LUC_GIAM_GIA{suffix}"
                 prefix = "Phu_Luc_Giam_Gia"
-            else:
-                tpl_name = "MASTER_TEMPLATE_VFINAL.docx"
+            elif template_type == "phu_luc_gia_han":
+                tpl_name = f"PHU_LUC_GIAM_GIA{suffix}" # Revert to GIAM_GIA template (patched with placeholders)
                 prefix = "Phu_Luc_Gia_Han"
+            elif template_type == "phu_luc_giam_gia_gia_han":
+                tpl_name = f"PHU_LUC_GIAM_GIA{suffix}"
+                prefix = "PL_GiamGia_GiaHan"
+            elif template_type == "thanh_ly_ky_lai":
+                tpl_name = f"THANH_LY_KY_LAI{suffix}"
+                prefix = "Thanh_Ly_Ky_Lai"
+            elif template_type == "thanh_ly_ky_moi":
+                tpl_name = f"THANH_LY_KY_LAI{suffix}"
+                prefix = "Thanh_Ly_Ky_Moi"
+            elif template_type == "ky_moi_hop_dong":
+                tpl_name = f"THANH_LY_KY_LAI{suffix}"
+                prefix = "Ky_Moi_Hop_Dong"
+            else:
+                tpl_name = f"PHU_LUC_GIAM_GIA{suffix}"
+                prefix = "Doc"
                 
             template_path = os.path.join(WORKSPACE_DIR, "templates", tpl_name)
             
-            success, out_filename_or_err = generate_document_from_cloud(site_data, template_path, OUTPUT_DIR, prefix)
+            success, out_filename_or_err = generate_document_from_cloud(site_data, template_path, OUTPUT_DIR, prefix, template_type)
             if success:
                 prog = _save_progress(template_type, out_filename_or_err)
                 return {"success": True, "filename": out_filename_or_err, "progress": prog}

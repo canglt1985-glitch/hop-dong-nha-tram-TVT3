@@ -1,55 +1,54 @@
 {
-  "updated_at": "2026-05-08T04:18:00Z",
+  "updated_at": "2026-05-14T11:45:00Z",
   "working_on": {
-    "feature": "Deploy & Performance",
-    "task": "Deploy Firebase Hosting & Resolve Caching/Pagination",
+    "feature": "N/A",
+    "task": "N/A",
     "status": "completed",
-    "files": [
-      "backend/main.py",
-      "frontend/src/App.tsx",
-      "frontend/firebase.json"
-    ],
-    "blockers": [],
-    "notes": "Frontend is deployed on Firebase Hosting. Backend is running locally on port 8000. Need to setup Cloudflare Tunnel or Render to expose Backend API."
+    "files": [],
+    "notes": "Đã hoàn tất dọn dẹp logic code và chuẩn hóa template Word. Sẵn sàng cho tính năng mới."
   },
-  "pending_tasks": [
-    {
-      "task": "Setup Backend API Tunnel or Deploy to Render",
-      "priority": "high",
-      "notes": "Firebase Hosting frontend cannot access localhost:8000."
-    }
-  ],
   "recent_changes": [
     {
-      "timestamp": "2026-05-08",
+      "timestamp": "2026-05-11T22:15:00Z",
       "type": "feature",
-      "description": "Implemented SITE_CACHE in backend/main.py to prevent Google Sheets N+1 timeout",
-      "files": ["backend/main.py"]
+      "description": "Chuẩn hóa ngày kết thúc hợp đồng luôn rơi vào cuối tháng sau 5 năm.",
+      "files": [
+        "backend/utils/pricing_utils.py",
+        "frontend/src/utils/siteLogic.ts"
+      ]
     },
     {
-      "timestamp": "2026-05-08",
+      "timestamp": "2026-05-11T22:20:00Z",
       "type": "feature",
-      "description": "Added Pagination logic (30 items/page) to frontend App.tsx",
-      "files": ["frontend/src/App.tsx"]
+      "description": "Tích hợp cột 'Hồ sơ pháp lý' từ Excel vào mục Căn cứ trong file Word.",
+      "files": [
+        "backend/main.py",
+        "backend/cloud_document_generator.py"
+      ]
     },
     {
-      "timestamp": "2026-05-08",
-      "type": "deploy",
-      "description": "Deployed frontend to Firebase Hosting tvt3-hdnt.web.app",
-      "files": ["frontend/firebase.json", "frontend/.firebaserc"]
-    }
-  ],
-  "errors_encountered": [
+      "timestamp": "2026-05-14T11:30:00Z",
+      "type": "refactor",
+      "description": "Chuẩn hóa Template Word (Xóa chữ cứng 30/09, thêm tag DEDUCTION_TEXT) và dọn code backend sinh Word.",
+      "files": [
+        "templates/*.docx",
+        "backend/cloud_document_generator.py"
+      ]
+    },
     {
-      "error": "Syntax Error missing </div> in App.tsx",
-      "solution": "Added missing closing div to the table wrapper",
-      "resolved": true
+      "timestamp": "2026-05-14T11:00:00Z",
+      "type": "setup",
+      "description": "Cài đặt Pytest, tạo tests/ và di chuyển debug scripts.",
+      "files": [
+        "backend/pytest.ini",
+        "backend/tests/*"
+      ]
     }
   ],
   "decisions_made": [
     {
-      "decision": "Use Firebase Hosting for frontend, keep backend local for now",
-      "reason": "Firebase Functions Python is hard for docx generation and user wanted quick internal testing"
+      "decision": "Loại bỏ logic ngày tháng riêng biệt cho Phụ lục",
+      "reason": "Để đồng nhất thời hạn 5 năm cho mọi loại văn bản tái ký/gia hạn."
     }
   ]
 }

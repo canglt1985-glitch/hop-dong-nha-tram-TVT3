@@ -1,0 +1,10 @@
+- [ ] Phase 01: Backend Date Logic
+    - [ ] Viết hàm `get_last_day_of_month`
+    - [ ] Viết hàm `calculate_aligned_cycles`
+    - [ ] Cập nhật `pricing_utils.py`
+- [ ] Phase 02: Frontend UI Update
+    - [ ] Cập nhật `siteLogic.ts`
+    - [ ] Cập nhật `App.tsx`
+- [ ] Phase 03: Word Template Integration
+    - [ ] Cập nhật `cloud_document_generator.py`
+- [ ] Phase 04: Testing & Verification

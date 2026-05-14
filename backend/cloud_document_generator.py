@@ -4,6 +4,8 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from docx.oxml.ns import qn
 import copy
+import calendar
+from utils.pricing_utils import calculate_aligned_cycles
 
 def format_vn_currency(amount):
     try:
@@ -71,16 +73,42 @@ def replace_tag_in_runs(p, tag, replacement):
 
 def calculate_contract_dates(expiry_date_val):
     try:
-        if isinstance(expiry_date_val, datetime): exp_date = expiry_date_val
-        else: exp_date = datetime.strptime(expiry_date_val[:10], "%Y-%m-%d")
-        month_end_date = exp_date + relativedelta(day=31)
-        start_date = month_end_date + relativedelta(days=1)
-        end_date = start_date + relativedelta(years=5) - relativedelta(days=1)
+        if isinstance(expiry_date_val, datetime): 
+            exp_date = expiry_date_val
+        else:
+            date_str = str(expiry_date_val).strip()
+            try:
+                # Thử format DD/MM/YYYY
+                exp_date = datetime.strptime(date_str[:10], "%d/%m/%Y")
+            except ValueError:
+                # Thử format YYYY-MM-DD
+                exp_date = datetime.strptime(date_str[:10], "%Y-%m-%d")
+                
+        # Ngày bắt đầu HĐ mới = Ngày sau ngày hết hạn cũ
+        start_date = exp_date + relativedelta(days=1)
+        
+        # Ngày kết thúc chuẩn hóa:
+        is_exact_month_start = start_date.day == 1
+        target_end_year = start_date.year + 5
+        
+        if is_exact_month_start:
+            # 01/06/2026 -> 31/05/2031
+            target_end_month = start_date.month - 1
+            if target_end_month == 0:
+                target_end_month = 12
+                target_end_year -= 1
+        else:
+            # 09/04/2026 -> 30/04/2031
+            target_end_month = start_date.month
+            
+        last_day = calendar.monthrange(target_end_year, target_end_month)[1]
+        end_date = datetime(target_end_year, target_end_month, last_day)
+        
         return start_date, end_date
     except Exception:
-        return datetime(2027, 7, 1), datetime(2032, 6, 30)
+        return datetime(2026, 4, 9), datetime(2031, 4, 30)
 
-def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
+def generate_document_from_cloud(site_data, template_path, output_dir, prefix, template_type=None):
     site_id = site_data.get("site_id", "")
     owner_name = site_data.get("owner", "")
     
@@ -115,12 +143,8 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
     start_date_str = start_date_dt.strftime("%d/%m/%Y")
     end_date_str = extended_end_date_dt.strftime("%d/%m/%Y")
     
-    is_phu_luc = "Phu_Luc" in prefix
-    if is_phu_luc and original_end_date_dt:
-        end_contract_dt = original_end_date_dt
-    else:
-        end_contract_dt = extended_end_date_dt
-        
+    # Always use the extended 5-year date for the contract term in these templates
+    end_contract_dt = extended_end_date_dt
     end_contract = end_contract_dt
     
     # OLD_END_DATE calculation
@@ -136,22 +160,31 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
     mfd_raw = float(prices.get("mfd", 0))
     cot_raw = float(prices.get("cot", 0))
     giam_tru_raw = float(prices.get("giam_tru", 0))
+    vhkt_raw = float(prices.get("vhkt", 0))
     
     # 4. LOGIC LÀM TRÒN HAI LỚP (Theo yêu cầu: 1256000 còn 1250000)
     # Lớp 1: Làm tròn hạng mục Cột (bao gồm giảm trừ dùng chung)
     cot_price_pay = ((int(cot_raw) + int(giam_tru_raw)) // 50000) * 50000
+    vhkt_price_pay = (int(vhkt_raw) // 50000) * 50000 if vhkt_raw > 0 else 0
     
     # Lớp 2: Tính tổng tạm thời và làm tròn xuống cho TỔNG CHỐT
-    temp_total = mb_raw + pm_raw + mfd_raw + cot_price_pay
-    # But wait, site_data already has new_price which might be from Excel!
-    # If site_data provides a specific 'new_price', we should use it?
-    # Actually, batch_processor.py computes new_price_val dynamically based on the 50000 rounding!
-    new_price_val = (int(temp_total) // 50000) * 50000
+    temp_total = mb_raw + pm_raw + mfd_raw + cot_price_pay + vhkt_price_pay
+    
+    provided_new_price = int(site_data.get("new_price", 0))
+    if provided_new_price > 0:
+        new_price_val = provided_new_price
+    else:
+        # If pure extension, keep old price
+        if template_type == "phu_luc_gia_han":
+            new_price_val = float(site_data.get("old_price", 0) or 0)
+        else:
+            new_price_val = (int(temp_total) // 50000) * 50000
     
     # Lớp 3: Làm tròn phòng máy và dồn phần còn lại vào Mặt bằng
     pm_price_pay = (int(pm_raw) // 50000) * 50000 if pm_raw > 0 else 0
     mfd_price_pay = (int(mfd_raw) // 50000) * 50000 if mfd_raw > 0 else 0
-    mb_price_pay = new_price_val - pm_price_pay - mfd_price_pay - cot_price_pay
+    mb_price_pay = new_price_val - pm_price_pay - mfd_price_pay - cot_price_pay - vhkt_price_pay
+
     
     new_price_str = format_vn_currency(new_price_val)
     new_price_text = number_to_vietnamese_words(new_price_val) + " đồng"
@@ -186,27 +219,27 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
             deduction_text = f"Giảm trừ số tiền đã thanh toán từ 01/10/2025 đến {paid_until} vào kỳ thanh toán tiếp theo."
     
     # Generate CSHT List dynamically
-    csht_items = []
-    if mb_raw > 0:
-        csht_items.append("Mặt bằng")
-    if mfd_raw > 0:
-        csht_items.append("Phòng MFĐ")
-    if pm_raw > 0:
-        csht_items.append("Phòng máy mặt đất")
-    if cot_raw > 0:
-        csht_items.append("Cột mặt đất >35m")
-    
-    if not csht_items:
-        csht_items.append("Mặt bằng")
-        
-    csht_list = "- " + "\n- ".join(csht_items) if csht_items else "- Mặt bằng"
+    csht_list = (
+        "- Vị trí đặt thiết bị: phòng có sẵn của chủ trạm, diện tích 3x3m, theo tiêu chuẩn của MobiFone.\n"
+        "- Vị trí đặt máy nổ: phòng có sẵn của chủ trạm, diện tích 3mx2m, theo tiêu chuẩn của MobiFone.\n"
+        "- Cột anten: cột dây co dưới mặt đất cao 36m có sẵn của chủ trạm.\n"
+        "- Hệ thống tiếp đất và hệ thống lạnh: MobiFone tự trang bị."
+    )
+
+    # For pure extension, remove certificate basis
+    hs_phap_ly = site_data.get("hs_phap_ly", "")
+    if template_type == "phu_luc_gia_han":
+        certificate_text = ""
+    else:
+        certificate_text = hs_phap_ly if hs_phap_ly and hs_phap_ly != "nan" else "................................................................................................................................"
 
     replacements = {
+        "{{CERTIFICATE}}": certificate_text,
+        "{{ CERTIFICATE }}": certificate_text,
         "{{SITE_ID}}": site_id,
         "{{ SITE_ID }}": site_id,
         "{{OWNER_NAME}}": owner_name,
         "{{ OWNER_NAME }}": owner_name,
-        "{{CONTRACT_NO}}": "",
         "{{ CONTRACT_NO }}": "",
         "{{CONTRACT_DATE}}": "",
         "{{ CONTRACT_DATE }}": "",
@@ -218,7 +251,10 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
         " ({{ ADDRESS_NEW }})": f" ({site_data.get('address_new')})" if site_data.get("address_new") and site_data.get("address_new") != "nan" else "",
         "{{LONGITUDE}}": longitude,
         "{{LATITUDE}}": latitude,
-        "{{CERTIFICATE}}": "________________________________________________________________________________",
+        "{{CERTIFICATE}}": certificate_text,
+        "{{ CERTIFICATE }}": certificate_text,
+        "{{LEGAL_DOCS}}": certificate_text,
+        "{{ LEGAL_DOCS }}": certificate_text,
         "{{START_DATE}}": start_date_str,
         "{{END_DATE}}": end_date_str,
         "{{NEW_PRICE}}": new_price_str,
@@ -262,11 +298,18 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
         "{{TL_COT}}": f"{((cot_price_pay / (cot_raw + giam_tru_raw)) - 1) * 100:.2f}%" if (cot_raw + giam_tru_raw) != 0 else "0%",
         "{{ TL_COT }}": f"{((cot_price_pay / (cot_raw + giam_tru_raw)) - 1) * 100:.2f}%" if (cot_raw + giam_tru_raw) != 0 else "0%",
         
-        "{{TONG_QD}}": format_vn_currency(mb_raw + pm_raw + mfd_raw + cot_raw + giam_tru_raw),
-        "{{ TONG_QD }}": format_vn_currency(mb_raw + pm_raw + mfd_raw + cot_raw + giam_tru_raw),
+        "{{VHKT_1245}}": format_vn_currency(vhkt_raw),
+        "{{ VHKT_1245 }}": format_vn_currency(vhkt_raw),
+        "{{P_VHKT}}": format_vn_currency(vhkt_price_pay),
+        "{{ P_VHKT }}": format_vn_currency(vhkt_price_pay),
+        "{{TL_VHKT}}": f"{((vhkt_price_pay / vhkt_raw) - 1) * 100:.2f}%" if vhkt_raw != 0 else "0%",
+        "{{ TL_VHKT }}": f"{((vhkt_price_pay / vhkt_raw) - 1) * 100:.2f}%" if vhkt_raw != 0 else "0%",
+        
+        "{{TONG_QD}}": format_vn_currency(mb_raw + pm_raw + mfd_raw + cot_raw + giam_tru_raw + vhkt_raw),
+        "{{ TONG_QD }}": format_vn_currency(mb_raw + pm_raw + mfd_raw + cot_raw + giam_tru_raw + vhkt_raw),
         "{{TONG_CHOT}}": format_vn_currency(new_price_val),
         "{{ TONG_CHOT }}": format_vn_currency(new_price_val),
-        "{{TL_TONG}}": f"{((new_price_val / (mb_raw + pm_raw + mfd_raw + cot_raw + giam_tru_raw)) - 1) * 100:.2f}%" if (mb_raw + pm_raw + mfd_raw + cot_raw + giam_tru_raw) != 0 else "0%",
+        "{{TL_TONG}}": f"{((new_price_val / (mb_raw + pm_raw + mfd_raw + cot_raw + giam_tru_raw + vhkt_raw)) - 1) * 100:.2f}%" if (mb_raw + pm_raw + mfd_raw + cot_raw + giam_tru_raw + vhkt_raw) != 0 else "0%",
         
         # Additional tags for Phu Luc Giam Gia and Thanh Ly
         "{{OLD_PRICE}}": format_vn_currency(site_data.get("old_price", 0)),
@@ -311,74 +354,41 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
                 p_element.getparent().remove(p_element)
                 p._p = p._element = None
     
-    # 5. GENERATE PAYMENT TABLE
+    # 5. GENERATE PAYMENT TABLE (Logic mới: Dồn ngày lẻ vào Kỳ 1)
     periods = []
     total_amount = 0
     cycle_months = 6
+    term_years = 5
 
-    if is_phu_luc:
-        # Start date for Phụ lục is paid_until + 1 day, default to 01/10/2025 if empty
-        curr_start = datetime(2025, 10, 1)
-        if paid_until and paid_until not in ["nan", "None"]:
-            try:
-                curr_start = datetime.strptime(paid_until[:10], "%d/%m/%Y") + relativedelta(days=1)
-            except Exception:
-                pass
-        c_no = 1
-        
-        while curr_start < end_contract:
-            curr_end = curr_start + relativedelta(months=cycle_months) - relativedelta(days=1)
-            amt = new_price_val * cycle_months # Basic calculation
-            
-            if c_no == 1 and total_deduction > 0:
+    # Lấy thông tin chu kỳ từ hàm tập trung
+    # start_date_str đã được định nghĩa ở trên là start_date_dt.strftime("%d/%m/%Y")
+    result = calculate_aligned_cycles(start_date_str, cycle_months, term_years, new_price_val)
+    
+    if "cycles" in result:
+        for c in result["cycles"]:
+            amt = c["amount"]
+            if c["index"] == 1 and total_deduction > 0:
                 amt -= total_deduction
-            
-            total_amount += amt
+                
+            # Chuyển đổi ngược lại format để tương thích code cũ bên dưới
             periods.append({
-                "no": c_no,
-                "start": curr_start,
-                "end": curr_end,
+                "no": c["index"],
+                "start": datetime.strptime(c["start"], "%d/%m/%Y"),
+                "end": datetime.strptime(c["end"], "%d/%m/%Y"),
                 "amount": amt
             })
-            
-            curr_start = curr_end + relativedelta(days=1)
-            c_no += 1
-            
-        if periods:
-            end_contract = periods[-1]["end"]
-            
+            total_amount += amt
+        
+        end_contract = datetime.strptime(result["end_date"], "%d/%m/%Y")
+        replacements["{{END_DATE}}"] = result["end_date"]
         replacements["{{TOTAL_AMOUNT}}"] = format_vn_currency(total_amount)
         replacements["{{ TOTAL_AMOUNT }}"] = format_vn_currency(total_amount)
-    else:
-        # Thanh Ly Ky Lai uses 10 periods
-        import calendar
-        curr_start = start_date_dt
-        for i in range(10):
-            if i == 0 and curr_start.day != 1:
-                last_day = calendar.monthrange(curr_start.year, curr_start.month)[1]
-                month_end_date = curr_start.replace(day=last_day)
-                odd_days = (month_end_date - curr_start).days + 1
-                curr_end = month_end_date + relativedelta(months=cycle_months)
-                amt = round((new_price_val / 30.0) * odd_days + new_price_val * cycle_months)
-            else:
-                curr_end = curr_start + relativedelta(months=cycle_months) - relativedelta(days=1)
-                amt = new_price_val * cycle_months
-                
-            total_amount += amt
-            periods.append({
-                "no": i + 1,
-                "start": curr_start,
-                "end": curr_end,
-                "amount": amt
-            })
-            curr_start = curr_end + relativedelta(days=1)
-            
-        end_contract = periods[-1]["end"]
 
     # 6. Global Replacements
     total_replacement = f"Tổng cộng:             {format_vn_currency(total_amount)}"
     import re
     
+    has_page_broken = False
     for p in doc.paragraphs:
         if "Tổng cộng:" in p.text:
             if re.search(r'[\d\.]+', p.text):
@@ -396,9 +406,6 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
             if tag in text:
                 text = text.replace(tag, str(rep))
                 
-        if "30/09/2028" in text:
-            text = text.replace("30/09/2028", end_contract.strftime('%d/%m/%Y'))
-            
         if text != original_text:
             p.text = text
             for run in p.runs:
@@ -413,8 +420,19 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
             "Thông tin tài khoản nhận thanh toán là",
             "Tên tài khoản:",
             "Số tài khoản:",
-            "Tại ngân hàng:"
+            "Tại ngân hàng:",
+            "Địa chỉ trạm:"
         ]
+        signature_triggers = [
+            "ĐẠI DIỆN MOBIFONE",
+            "ĐẠI DIỆN BÊN THUÊ",
+            "ĐẠI DIỆN BÊN CHO THUÊ",
+            "XÁC NHẬN CỦA ĐƠN VỊ"
+        ]
+        if not has_page_broken and any(trigger in p.text.upper() for trigger in signature_triggers):
+            p.paragraph_format.page_break_before = True
+            has_page_broken = True
+            
         if any(trigger in p.text for trigger in bold_triggers) or (owner_name and p.text.strip() == owner_name.strip()):
             for run in p.runs:
                 run.bold = True
@@ -429,9 +447,6 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix):
                         if tag in text:
                             text = text.replace(tag, str(rep))
                             
-                    if "30/09/2028" in text:
-                        text = text.replace("30/09/2028", end_contract.strftime('%d/%m/%Y'))
-                        
                     if text != original_text:
                         p.text = text
                         for run in p.runs:

@@ -518,7 +518,7 @@
     "last_updated": "2026-05-07T14:23:59.199368"
   },
   "DNCM23": {
-    "selected_template": "phu_luc_giam_gia",
+    "selected_template": "thanh_ly_ky_lai",
     "status": "trinh_ky_phu_luc",
     "progress": {
       "draft_prepared": true,
@@ -529,7 +529,7 @@
     "new_contract_no": "",
     "new_contract_date": "",
     "new_price_confirmed": null,
-    "last_updated": "2026-05-07T14:23:59.708824"
+    "last_updated": "2026-05-14T09:37:25.205358"
   },
   "DNTN24": {
     "selected_template": "phu_luc_giam_gia",
@@ -557,7 +557,7 @@
     "new_contract_no": "",
     "new_contract_date": "",
     "new_price_confirmed": null,
-    "last_updated": "2026-05-07T14:24:00.728344"
+    "last_updated": "2026-05-14T08:41:56.835071"
   },
   "DNLK29": {
     "selected_template": "phu_luc_giam_gia",
@@ -753,7 +753,7 @@
     "new_contract_no": "",
     "new_contract_date": "",
     "new_price_confirmed": null,
-    "last_updated": "2026-05-07T14:24:07.862671"
+    "last_updated": "2026-05-14T09:01:33.982356"
   },
   "DNCM34": {
     "selected_template": "phu_luc_giam_gia",
@@ -862,7 +862,7 @@
     "last_updated": "2026-05-07T16:51:34.782233"
   },
   "DNCM18": {
-    "selected_template": "phu_luc_giam_gia",
+    "selected_template": "thanh_ly_ky_lai",
     "status": "dong_y",
     "new_contract_no": "",
     "new_contract_date": "",
@@ -873,7 +873,7 @@
       "signed_and_stamped": false,
       "archived_doc": false
     },
-    "last_updated": "2026-05-08T14:27:20.843983"
+    "last_updated": "2026-05-08T21:35:20.376724"
   },
   "DNLK19": {
     "selected_template": "phu_luc_giam_gia",
@@ -916,5 +916,131 @@
       "archived_doc": false
     },
     "last_updated": "2026-05-08T09:57:38.672700"
+  },
+  "DNLK16": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "dong_y",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": 4500000.0,
+    "last_updated": "2026-05-14T09:42:54.219299"
+  },
+  "DNXL36": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "dong_y",
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-08T16:32:41.625837"
+  },
+  "DNLK05": {
+    "selected_template": "phu_luc_giam_gia",
+    "status": "dong_y",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": true,
+      "signed_and_stamped": true,
+      "archived_doc": true
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": 8020000.0,
+    "last_updated": "2026-05-08T17:03:37.124997"
+  },
+  "DNTN01": {
+    "selected_template": "phu_luc_gia_han",
+    "status": "dong_y",
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-11T22:17:16.158970"
+  },
+  "DNCM33": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "dong_y",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": 3150000.0,
+    "last_updated": "2026-05-14T09:36:47.823155"
+  },
+  "DNTN52": {
+    "selected_template": "thanh_ly_ky_lai",
+    "status": "can_thanh_ly",
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": 3950000.0,
+    "last_updated": "2026-05-11T22:23:31.003829"
+  },
+  "DNDQ44": {
+    "selected_template": "phu_luc_giam_gia_gia_han",
+    "status": "dong_y",
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-14T09:21:20.966202"
+  },
+  "DNDQ46": {
+    "selected_template": "phu_luc_giam_gia_gia_han",
+    "status": "dong_y",
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-14T09:26:04.518936"
+  },
+  "DNLK44": {
+    "selected_template": "phu_luc_giam_gia_gia_han",
+    "status": "dong_y",
+    "new_contract_no": "",
+    "new_contract_date": "",
+    "new_price_confirmed": null,
+    "progress": {
+      "draft_prepared": true,
+      "submitted_internal": false,
+      "signed_and_stamped": false,
+      "archived_doc": false
+    },
+    "last_updated": "2026-05-14T09:26:38.507473"
   }
 }
