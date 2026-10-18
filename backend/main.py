@@ -14,13 +14,9 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, Optional, List
 
-from utils.data_utils import parse_numeric_value, find_header_indices
+from utils.data_utils import parse_numeric_value, find_header_indices, format_date_vn
 from services.sync_service import fetch_online_progress, sync_post_to_google_sheet_async
 from utils.pricing_utils import calculate_pricing_breakdown
-from word_service import WordService
-
-# Add the parent directory to Python path to import generate_thanh_ly_contract if needed
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 app = FastAPI(title="BTS Contract Automation API")
 
@@ -42,6 +38,31 @@ OUTPUT_DIR = os.path.join(WORKSPACE_DIR, "output")
 
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
+
+def cleanup_output_dir(max_keep: int = 20):
+    """Giữ thư mục output gọn gàng, chỉ lưu tối đa max_keep tệp gần nhất để tránh tích tụ rác."""
+    try:
+        if not os.path.exists(OUTPUT_DIR):
+            return
+        files = []
+        for f in os.listdir(OUTPUT_DIR):
+            full_path = os.path.join(OUTPUT_DIR, f)
+            if os.path.isfile(full_path) and not f.startswith('.'):
+                files.append((full_path, os.path.getmtime(full_path)))
+        
+        # Sort by mtime descending (mới nhất lên đầu)
+        files.sort(key=lambda x: x[1], reverse=True)
+        if len(files) > max_keep:
+            for old_file, _ in files[max_keep:]:
+                try:
+                    os.remove(old_file)
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"Warning: Cleanup output dir failed: {e}")
+
+# Dọn dẹp khởi động
+cleanup_output_dir(max_keep=20)
 
 # --- CONFIG UTILITIES ---
 def load_config() -> Dict:
@@ -90,10 +111,25 @@ class ProgressUpdate(BaseModel):
     new_contract_no: Optional[str] = None
     new_contract_date: Optional[str] = None
     new_price_confirmed: Optional[float] = None
+    prices_breakdown: Optional[Dict[str, float]] = None
 
 class SettingsUpdate(BaseModel):
     spreadsheet_id: str
     web_app_url: str
+
+class BulkCCTRequest(BaseModel):
+    site_ids: List[str]
+    party: Optional[str] = "B"
+    include_extension: bool = False
+
+class BBLVRequest(BaseModel):
+    representative: str
+    scenario: Optional[str] = "auto"
+
+class BulkBBLVRequest(BaseModel):
+    site_ids: List[str]
+    representative: str
+    scenario: Optional[str] = "auto"
 
 # --- API ENDPOINTS ---
 
@@ -122,6 +158,7 @@ SITE_CACHE = {
     "last_fetched": 0
 }
 CACHE_TTL = 1800  # 30 minutes
+COPY_DATE_OVERLAY_CACHE = None
 
 @app.get("/sites")
 def get_sites(force_refresh: bool = False):
@@ -129,7 +166,7 @@ def get_sites(force_refresh: bool = False):
     Loads sites from Google Sheets directly (online master data), 
     falling back to local DATA HOP DONG.xlsx if offline.
     """
-    global SITE_CACHE
+    global SITE_CACHE, COPY_DATE_OVERLAY_CACHE
     
     if not force_refresh and SITE_CACHE["data"] is not None:
         if time.time() - SITE_CACHE["last_fetched"] < CACHE_TTL:
@@ -148,7 +185,7 @@ def get_sites(force_refresh: bool = False):
         url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid=0"
         try:
             print(f"Fetching master contract data from Google Sheet: {url}")
-            response = requests.get(url, timeout=5)
+            response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 response.encoding = 'utf-8'
                 df = pd.read_csv(io.StringIO(response.text), header=None, dtype=str)
@@ -169,11 +206,11 @@ def get_sites(force_refresh: bool = False):
 
     # 1b. Fetch VB1245 sheet online if available
     vb_map = {}
-    if spreadsheet_id:
+    if spreadsheet_id and loaded_online:
         url_vb = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:csv&sheet=VB1245"
         try:
             print(f"Fetching VB1245 data from Google Sheet: {url_vb}")
-            response_vb = requests.get(url_vb, timeout=5)
+            response_vb = requests.get(url_vb, timeout=10)
             if response_vb.status_code == 200:
                 response_vb.encoding = 'utf-8'
                 df_vb = pd.read_csv(io.StringIO(response_vb.text), header=None, dtype=str)
@@ -255,9 +292,39 @@ def get_sites(force_refresh: bool = False):
                     progress_data[site_id] = online_rec
                 save_progress(progress_data)
 
+        # Load updated date overlay map from Copy of DATA file if available
+        if COPY_DATE_OVERLAY_CACHE is None:
+            copy_date_overlay_map = {}
+            copy_excel_path = r"D:\Chuyen doi so\soan HD\Copy of DATA Trạm Nhà Dân + Pháp Nhân + VNPT + VNPOST_update.xlsx"
+            if os.path.exists(copy_excel_path):
+                try:
+                    print(f"Loading date overlay map from: {copy_excel_path}")
+                    df_c = pd.read_excel(copy_excel_path, sheet_name=0, header=6)
+                    for _, c_row in df_c.iterrows():
+                        c_sid = str(c_row.iloc[2]).strip().upper() if pd.notna(c_row.iloc[2]) else ""
+                        if c_sid and c_sid != "NAN" and c_sid != "NONE" and "MÃ TRẠM" not in c_sid:
+                            c_end = format_date_vn(c_row.iloc[34]) if pd.notna(c_row.iloc[34]) else ""
+                            c_paid = format_date_vn(c_row.iloc[79]) if pd.notna(c_row.iloc[79]) else ""
+                            copy_date_overlay_map[c_sid] = {"end_date": c_end, "paid_until": c_paid}
+                    print(f"Loaded date overlay mapping for {len(copy_date_overlay_map)} sites!")
+                except Exception as c_err:
+                    print(f"Warning: Failed to load date overlay map from Copy of DATA file: {c_err}")
+
+            # Explicit override for DNCM12 as requested
+            copy_date_overlay_map["DNCM12"] = {"end_date": "30/04/2029", "paid_until": "14/04/2024"}
+            COPY_DATE_OVERLAY_CACHE = copy_date_overlay_map
+        else:
+            copy_date_overlay_map = COPY_DATE_OVERLAY_CACHE
+
         # Get dynamic column mapping indices
         col_map = find_header_indices(df)
         print("Resolved Column Mapping Indices:", col_map)
+        
+        # Safe padding in case Google Sheets truncates trailing empty columns
+        max_col_needed = max(col_map.values()) if col_map.values() else 0
+        if max_col_needed >= df.shape[1]:
+            for i in range(df.shape[1], max_col_needed + 1):
+                df[i] = pd.NA
         
         sites_list = []
         for r_idx in range(7, df.shape[0]):  # Starts from row index 7 for actual data rows
@@ -273,6 +340,11 @@ def get_sites(force_refresh: bool = False):
             contract_no = str(df.iloc[r_idx, col_map.get("contract_no", 24)]).strip() if "contract_no" in col_map and pd.notna(df.iloc[r_idx, col_map["contract_no"]]) else ""
             phone = str(df.iloc[r_idx, col_map.get("phone", 12)]).strip() if "phone" in col_map and pd.notna(df.iloc[r_idx, col_map["phone"]]) else ""
             
+            # New Owner Information mapped from data_utils (secondary hits)
+            new_owner_name = str(df.iloc[r_idx, col_map["new_owner"]]).strip() if "new_owner" in col_map and pd.notna(df.iloc[r_idx, col_map["new_owner"]]) else ""
+            new_owner_address = str(df.iloc[r_idx, col_map["new_owner_address"]]).strip() if "new_owner_address" in col_map and pd.notna(df.iloc[r_idx, col_map["new_owner_address"]]) else ""
+            new_owner_phone = str(df.iloc[r_idx, col_map["new_owner_phone"]]).strip() if "new_owner_phone" in col_map and pd.notna(df.iloc[r_idx, col_map["new_owner_phone"]]) else ""
+            
             address_old = str(df.iloc[r_idx, col_map.get("address_old", 35)]).strip() if "address_old" in col_map and pd.notna(df.iloc[r_idx, col_map["address_old"]]) else ""
             address_new = str(df.iloc[r_idx, col_map.get("address_new", 41)]).strip() if "address_new" in col_map and pd.notna(df.iloc[r_idx, col_map["address_new"]]) else ""
             if address_new and address_new != "nan" and "Đồng Nai" not in address_new:
@@ -281,36 +353,21 @@ def get_sites(force_refresh: bool = False):
             hs_phap_ly = str(df.iloc[r_idx, col_map.get("hs_phap_ly", 42)]).strip() if "hs_phap_ly" in col_map and pd.notna(df.iloc[r_idx, col_map["hs_phap_ly"]]) else ""
             
             contract_date_val = df.iloc[r_idx, col_map["contract_date"]] if "contract_date" in col_map else None
-            contract_date_str = ""
-            if pd.notna(contract_date_val):
-                if isinstance(contract_date_val, datetime):
-                    contract_date_str = contract_date_val.strftime("%d/%m/%Y")
-                else:
-                    contract_date_str = str(contract_date_val).strip()
+            contract_date_str = format_date_vn(contract_date_val)
             
             end_date_val = df.iloc[r_idx, col_map["end_date"]]
+            if site_id in copy_date_overlay_map and copy_date_overlay_map[site_id].get("end_date"):
+                end_date_val = copy_date_overlay_map[site_id]["end_date"]
             
-            # Format expiry date
-            end_date_str = ""
+            # Format expiry date using format_date_vn
+            end_date_str = format_date_vn(end_date_val)
             needs_ext = False
-            if pd.notna(end_date_val):
-                if isinstance(end_date_val, datetime):
-                    end_date_str = end_date_val.strftime("%d/%m/%Y")
-                    needs_ext = end_date_val < datetime(2026, 7, 1)
-                else:
-                    end_date_str = str(end_date_val).strip()
-                    # Try to parse string dates
-                    try:
-                        parsed_dt = datetime.strptime(end_date_str, "%d/%m/%Y")
-                        needs_ext = parsed_dt < datetime(2026, 7, 1)
-                    except ValueError:
-                        try:
-                            parsed_dt = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
-                            end_date_str = parsed_dt.strftime("%d/%m/%Y")
-                            needs_ext = parsed_dt < datetime(2026, 7, 1)
-                        except ValueError:
-                            # Fuzzy fallbacks
-                            needs_ext = "2026" in end_date_str or "2025" in end_date_str or "2024" in end_date_str
+            if end_date_str:
+                try:
+                    parsed_dt = datetime.strptime(end_date_str, "%d/%m/%Y")
+                    needs_ext = parsed_dt < datetime(2026, 7, 1)
+                except ValueError:
+                    needs_ext = "2026" in end_date_str or "2025" in end_date_str or "2024" in end_date_str
             else:
                 end_date_str = "Chưa rõ"
                 needs_ext = True
@@ -373,6 +430,11 @@ def get_sites(force_refresh: bool = False):
             # Smart determination of new_price
             if site_id in progress_data and progress_data[site_id].get("new_price_confirmed"):
                 new_price = int(progress_data[site_id]["new_price_confirmed"])
+                reduced_price_vb = float(new_price)
+                if new_price < old_price:
+                    has_agreed_vb = True
+                    reached_target_vb = "Đạt"
+                    reduction_amount_vb = float(old_price - new_price)
             elif reduced_price_vb > 0:
                 new_price = int(reduced_price_vb)
             elif reduction_amount_vb > 0:
@@ -383,7 +445,9 @@ def get_sites(force_refresh: bool = False):
                 new_price = elem_price if elem_price > 0 else int(old_price)
                 
             # Compute reached_target dynamically!
-            if new_price > 0 and new_price_val > 0:
+            if site_id in progress_data and progress_data[site_id].get("new_price_confirmed"):
+                pass
+            elif new_price > 0 and new_price_val > 0:
                 if new_price <= new_price_val:
                     reached_target_vb = "Đạt"
                 else:
@@ -395,15 +459,25 @@ def get_sites(force_refresh: bool = False):
             # Extracted details for payment cycles and bank compliance
             payment_cycle = str(df.iloc[r_idx, col_map["payment_cycle"]]).strip() if pd.notna(df.iloc[r_idx, col_map["payment_cycle"]]) else "6 tháng"
             paid_until_date = str(df.iloc[r_idx, col_map["paid_until_date"]]).strip() if "paid_until_date" in col_map and pd.notna(df.iloc[r_idx, col_map["paid_until_date"]]) else ""
+            if site_id in copy_date_overlay_map and copy_date_overlay_map[site_id].get("paid_until"):
+                paid_until_date = copy_date_overlay_map[site_id]["paid_until"]
+            paid_until_date = format_date_vn(paid_until_date)
             account_owner = str(df.iloc[r_idx, col_map["account_owner"]]).strip() if pd.notna(df.iloc[r_idx, col_map["account_owner"]]) else owner_name
             account_no = str(df.iloc[r_idx, col_map["account_no"]]).strip() if pd.notna(df.iloc[r_idx, col_map["account_no"]]) else ""
             bank_name = str(df.iloc[r_idx, col_map["bank_name"]]).strip() if pd.notna(df.iloc[r_idx, col_map["bank_name"]]) else ""
             bank_branch = str(df.iloc[r_idx, col_map["bank_branch"]]).strip() if pd.notna(df.iloc[r_idx, col_map["bank_branch"]]) else ""
+            
+            new_bank_owner = str(df.iloc[r_idx, col_map["new_bank_owner"]]).strip() if "new_bank_owner" in col_map and pd.notna(df.iloc[r_idx, col_map["new_bank_owner"]]) else ""
+            new_bank_no = str(df.iloc[r_idx, col_map["new_bank_no"]]).strip() if "new_bank_no" in col_map and pd.notna(df.iloc[r_idx, col_map["new_bank_no"]]) else ""
+            new_bank_name = str(df.iloc[r_idx, col_map["new_bank_name"]]).strip() if "new_bank_name" in col_map and pd.notna(df.iloc[r_idx, col_map["new_bank_name"]]) else ""
+            new_bank_branch = str(df.iloc[r_idx, col_map["new_bank_branch"]]).strip() if "new_bank_branch" in col_map and pd.notna(df.iloc[r_idx, col_map["new_bank_branch"]]) else ""
+            
             to_vt = str(df.iloc[r_idx, col_map["to_vt"]]).strip() if pd.notna(df.iloc[r_idx, col_map["to_vt"]]) else "Chưa rõ"
             dat_muc_tieu_1245 = str(df.iloc[r_idx, col_map["dat_muc_tieu_1245"]]).strip() if pd.notna(df.iloc[r_idx, col_map["dat_muc_tieu_1245"]]) else ""
             duoc_thanh_toan_1245 = str(df.iloc[r_idx, col_map["duoc_thanh_toan_1245"]]).strip() if pd.notna(df.iloc[r_idx, col_map["duoc_thanh_toan_1245"]]) else ""
-            hs_phap_ly = str(df.iloc[r_idx, col_map["hs_phap_ly"]]).strip() if "hs_phap_ly" in col_map and pd.notna(df.iloc[r_idx, col_map["hs_phap_ly"]]) else ""
-
+            latitude = str(df.iloc[r_idx, col_map.get("latitude", 98)]).strip() if "latitude" in col_map and pd.notna(df.iloc[r_idx, col_map["latitude"]]) else ""
+            longitude = str(df.iloc[r_idx, col_map.get("longitude", 97)]).strip() if "longitude" in col_map and pd.notna(df.iloc[r_idx, col_map["longitude"]]) else ""
+            
             # Match checking: check if the bank account name matches the landlord name
             is_owner_match = owner_name.lower().strip() in account_owner.lower().strip() or account_owner.lower().strip() in owner_name.lower().strip()
             owner_match_status = "✅ Khớp" if is_owner_match else f"⚠️ Lệch (Bank: {account_owner})"
@@ -417,7 +491,7 @@ def get_sites(force_refresh: bool = False):
                 default_status = "dong_y"  # If not agreed and not expired, it defaults to active contract (reducing price workflow)
 
             # Fetch progress if any
-            is_mbf = "MBF" in str(site_type).upper()
+            is_mbf = "MBF" in str(site_type).upper() or "MOBIFONE" in str(site_type).upper() or "MAT" in str(site_type).upper() or "MẶT" in str(site_type).upper()
             default_ext_template = "phu_luc_gia_han" if is_mbf else "thanh_ly_ky_lai"
             
             prog_info = progress_data.get(site_id, {
@@ -442,6 +516,9 @@ def get_sites(force_refresh: bool = False):
             if "new_price_confirmed" not in prog_info:
                 prog_info["new_price_confirmed"] = None
             
+            if prog_info.get("new_price_confirmed") is not None:
+                new_price = int(prog_info["new_price_confirmed"])
+            
             sites_list.append({
                 "site_id": site_id,
                 "owner": owner_name,
@@ -449,6 +526,8 @@ def get_sites(force_refresh: bool = False):
                 "phone": phone,
                 "contract_no": contract_no,
                 "contract_date": contract_date_str,
+                "latitude": latitude,
+                "longitude": longitude,
                 "address_old": address_old,
                 "address_new": address_new,
                 "hs_phap_ly": hs_phap_ly,
@@ -466,7 +545,7 @@ def get_sites(force_refresh: bool = False):
                 "reduced_price": reduced_price_vb,
                 "negotiation_date": negotiation_date_vb,
                 "effective_date": effective_date_vb,
-                "prices_breakdown": {
+                "prices_breakdown": prog_info.get("prices_breakdown") or {
                     "mb": mb_price,
                     "pm": pm_price,
                     "mfd": mfd_price,
@@ -485,6 +564,15 @@ def get_sites(force_refresh: bool = False):
                     "bank_branch": bank_branch,
                     "is_owner_match": is_owner_match,
                     "match_status_text": owner_match_status
+                },
+                "new_owner_info": {
+                    "name": new_owner_name,
+                    "address": new_owner_address,
+                    "phone": new_owner_phone,
+                    "bank_owner": new_bank_owner,
+                    "bank_no": new_bank_no,
+                    "bank_name": new_bank_name,
+                    "bank_branch": new_bank_branch
                 },
                 "progress_tracker": prog_info
             })
@@ -507,10 +595,32 @@ def update_progress(data: ProgressUpdate):
         "new_contract_no": data.new_contract_no or "",
         "new_contract_date": data.new_contract_date or "",
         "new_price_confirmed": data.new_price_confirmed,
+        "prices_breakdown": data.prices_breakdown,
         "last_updated": datetime.now().isoformat()
     }
     progress_data[data.site_id] = record
     save_progress(progress_data)
+    
+    # Update in-memory cache directly instead of wiping out Google Sheets cache
+    global SITE_CACHE
+    if SITE_CACHE["data"] is not None:
+        for s in SITE_CACHE["data"]:
+            if s["site_id"] == data.site_id:
+                s["progress_tracker"] = record
+                s["selected_template"] = data.selected_template
+                if data.new_price_confirmed is not None:
+                    confirmed = int(data.new_price_confirmed)
+                    s["new_price"] = confirmed
+                    s["reduced_price"] = float(confirmed)
+                    s["has_agreed_1245"] = confirmed < s.get("old_price", 0)
+                    s["reached_target"] = "Đạt"
+                    if s.get("old_price") and s["old_price"] > confirmed:
+                        s["reduction_amount"] = s["old_price"] - confirmed
+                if data.prices_breakdown:
+                    s["prices_breakdown"] = data.prices_breakdown
+                break
+    else:
+        SITE_CACHE["last_fetched"] = 0
     
     # Dispatch sync to Google Sheets online in background
     config = load_config()
@@ -554,11 +664,89 @@ def _fmt(n) -> str:
     try: return f"{int(n):,}".replace(",", ".")
     except: return "0"
 
+@app.post("/generate-bulk-cct")
+def generate_bulk_cct(data: BulkCCTRequest):
+    site_ids = [s.strip().upper() for s in data.site_ids if s.strip()]
+    if not site_ids:
+        raise HTTPException(status_code=400, detail="Danh sách mã trạm trống.")
+    try:
+        sites = get_sites()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi tải dữ liệu: {e}")
+    
+    party = getattr(data, "party", "B").upper()
+    if party == "A":
+        template_name = "PHU_LUC_CHUYEN_CHU_THE_BEN_A.docx"
+        prefix = "Phu_Luc_CCT_A"
+        tpl_type = "phu_luc_cct_a"
+    else:
+        template_name = "PHU_LUC_CHUYEN_CHU_THE.docx"
+        prefix = "Phu_Luc_CCT_B"
+        tpl_type = "phu_luc_cct"
+        
+    from cloud_document_generator import generate_document_from_cloud
+    template_path = os.path.join(WORKSPACE_DIR, "templates", template_name)
+    if not os.path.exists(template_path):
+        raise HTTPException(status_code=500, detail=f"Không tìm thấy mẫu CCT ({template_name})")
+    generated_files = []
+    errors = []
+    for site_id in site_ids:
+        site_data = next((s for s in sites if s["site_id"] == site_id), None)
+        if not site_data:
+            errors.append(f"🔴 {site_id}: Không tìm thấy thông tin trên Sheet")
+            continue
+        try:
+            success, result_fname = generate_document_from_cloud(
+                site_data, template_path, OUTPUT_DIR, prefix, tpl_type, apply_vb1245=False, apply_extension=getattr(data, "include_extension", False)
+            )
+            if success:
+                generated_files.append(result_fname)
+            else:
+                errors.append(f"🔴 {site_id}: Lỗi tạo file - {result_fname}")
+        except Exception as e:
+            errors.append(f"🔴 {site_id}: Lỗi - {str(e)}")
+    if not generated_files:
+        raise HTTPException(status_code=400, detail=f"Không xuất được trạm nào. Chi tiết lỗi: {'; '.join(errors)}")
+    import zipfile
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    zip_filename = f"Bulk_PhuLuc_CCT_{timestamp}.zip"
+    zip_path = os.path.join(OUTPUT_DIR, zip_filename)
+    with zipfile.ZipFile(zip_path, 'w') as zipf:
+        for f in generated_files:
+            zipf.write(os.path.join(OUTPUT_DIR, f), arcname=f)
+    return {
+        "success": True, 
+        "filename": zip_filename, 
+        "count": len(generated_files), 
+        "errors": errors
+    }
+
 @app.post("/generate/{site_id}")
-def generate_document(site_id: str, template_type: str = Body(..., embed=True)):
+def generate_document(
+    site_id: str, 
+    template_type: str = Body(..., embed=True), 
+    apply_vb1245: bool = Body(True, embed=True),
+    representative: Optional[str] = Body(None, embed=True),
+    scenario: Optional[str] = Body(None, embed=True),
+    extension_years: Optional[int] = Body(None, embed=True),
+    custom_start_date: Optional[str] = Body(None, embed=True),
+    prices_breakdown: Optional[dict] = Body(None, embed=True),
+    new_price_confirmed: Optional[float] = Body(None, embed=True)
+):
     """Triggers dynamic docx generation for a specific site & template type."""
     site_id = site_id.upper()
-    print(f"Generating docx for: {site_id} with template {template_type}")
+    
+    # Sanitize FastAPI Body parameters
+    if not isinstance(representative, str): representative = None
+    if not isinstance(scenario, str): scenario = None
+    if not isinstance(custom_start_date, str): custom_start_date = None
+    if not isinstance(extension_years, (int, float)): 
+        extension_years = None
+    elif extension_years: 
+        extension_years = int(extension_years)
+    if not isinstance(prices_breakdown, dict): prices_breakdown = None
+
+    print(f"Generating docx for: {site_id} with template {template_type}, extension_years={extension_years}, custom_start_date={custom_start_date}, new_price_confirmed={new_price_confirmed}")
 
     def _save_progress(tpl_type, filename):
         progress_data = load_progress()
@@ -568,7 +756,7 @@ def generate_document(site_id: str, template_type: str = Body(..., embed=True)):
                 "status": "dong_y",
                 "new_contract_no": "",
                 "new_contract_date": "",
-                "new_price_confirmed": None,
+                "new_price_confirmed": int(float(new_price_confirmed)) if (new_price_confirmed is not None and float(new_price_confirmed) > 0) else None,
                 "progress": {"draft_prepared": True, "submitted_internal": False, "signed_and_stamped": False, "archived_doc": False}
             }
         else:
@@ -576,6 +764,8 @@ def generate_document(site_id: str, template_type: str = Body(..., embed=True)):
                 progress_data[site_id]["progress"] = {}
             progress_data[site_id]["progress"]["draft_prepared"] = True
             progress_data[site_id]["selected_template"] = tpl_type
+            if new_price_confirmed is not None and float(new_price_confirmed) > 0:
+                progress_data[site_id]["new_price_confirmed"] = int(float(new_price_confirmed))
         progress_data[site_id]["last_updated"] = datetime.now().isoformat()
         save_progress(progress_data)
         config = load_config()
@@ -584,48 +774,128 @@ def generate_document(site_id: str, template_type: str = Body(..., embed=True)):
             sync_post_to_google_sheet_async(web_app_url, {site_id: progress_data[site_id]})
         return progress_data[site_id]
 
-    if template_type in ["thanh_ly_ky_lai", "phu_luc_giam_gia", "phu_luc_gia_han", "phu_luc_giam_gia_gia_han", "thanh_ly_ky_moi", "ky_moi_hop_dong"]:
+    if template_type in ["thanh_ly_ky_lai", "phu_luc_giam_gia", "phu_luc_gia_han", "phu_luc_gia_han_ngan_han", "phu_luc_giam_gia_gia_han", "phu_luc_giam_gia_gia_han_ngan_han", "thanh_ly_ky_moi", "ky_moi_hop_dong", "phu_luc_cct_a", "phu_luc_cct_a_gia_han", "phu_luc_cct", "phu_luc_cct_gia_han"]:
         from cloud_document_generator import generate_document_from_cloud
         try:
             sites = get_sites()
             site_data = next((s for s in sites if s["site_id"] == site_id), None)
             if not site_data:
                 raise HTTPException(status_code=404, detail=f"Không tìm thấy dữ liệu cho trạm {site_id}")
+
+            # Override with custom confirmed price if provided
+            if new_price_confirmed is not None and float(new_price_confirmed) > 0:
+                confirmed = int(float(new_price_confirmed))
+                site_data["new_price"] = confirmed
+                site_data["reduced_price"] = float(confirmed)
+                site_data["has_agreed_1245"] = confirmed < site_data.get("old_price", 0)
+                site_data["reached_target"] = "Đạt"
+                global SITE_CACHE
+                if SITE_CACHE["data"] is not None:
+                    for s in SITE_CACHE["data"]:
+                        if s["site_id"] == site_id:
+                            s["new_price"] = confirmed
+                            s["reduced_price"] = float(confirmed)
+                            s["has_agreed_1245"] = confirmed < s.get("old_price", 0)
+                            s["reached_target"] = "Đạt"
+                            if "progress_tracker" in s:
+                                s["progress_tracker"]["new_price_confirmed"] = confirmed
+
+            print(f"DEBUG: Generating document for {site_id}. new_price = {site_data.get('new_price')}")
+            
+            # Allow custom prices_breakdown override
+            if prices_breakdown and isinstance(prices_breakdown, dict):
+                site_data["prices_breakdown"] = prices_breakdown
                 
             site_type_val = str(site_data.get("site_type", "")).strip().upper()
             # Only MBF gets MAT_BANG template
-            is_mbf = "MBF" in site_type_val or "MOBIFONE" in site_type_val
+            is_mbf = "MBF" in site_type_val or "MOBIFONE" in site_type_val or "MAT" in site_type_val or "MẶT" in site_type_val
             suffix = "_MAT_BANG.docx" if is_mbf else "_CSHT.docx"
             
             # Mapping logic based on user request
             if template_type == "phu_luc_giam_gia":
                 tpl_name = f"PHU_LUC_GIAM_GIA{suffix}"
                 prefix = "Phu_Luc_Giam_Gia"
-            elif template_type == "phu_luc_gia_han":
-                tpl_name = f"PHU_LUC_GIAM_GIA{suffix}" # Revert to GIAM_GIA template (patched with placeholders)
-                prefix = "Phu_Luc_Gia_Han"
-            elif template_type == "phu_luc_giam_gia_gia_han":
+            elif template_type in ["phu_luc_gia_han", "phu_luc_gia_han_ngan_han"]:
                 tpl_name = f"PHU_LUC_GIAM_GIA{suffix}"
-                prefix = "PL_GiamGia_GiaHan"
+                prefix = "Phu_Luc_Gia_Han_Ngan_Han" if template_type == "phu_luc_gia_han_ngan_han" else "Phu_Luc_Gia_Han"
+            elif template_type in ["phu_luc_giam_gia_gia_han", "phu_luc_giam_gia_gia_han_ngan_han"]:
+                tpl_name = f"PHU_LUC_GIAM_GIA{suffix}"
+                prefix = "PL_GiamGia_GiaHan_NganHan" if template_type == "phu_luc_giam_gia_gia_han_ngan_han" else "PL_GiamGia_GiaHan"
             elif template_type == "thanh_ly_ky_lai":
                 tpl_name = f"THANH_LY_KY_LAI{suffix}"
                 prefix = "Thanh_Ly_Ky_Lai"
             elif template_type == "thanh_ly_ky_moi":
-                tpl_name = f"THANH_LY_KY_LAI{suffix}"
+                tpl_name = f"THANH_LY_KY_MOI{suffix}"
                 prefix = "Thanh_Ly_Ky_Moi"
             elif template_type == "ky_moi_hop_dong":
-                tpl_name = f"THANH_LY_KY_LAI{suffix}"
+                tpl_name = f"HOP_DONG_MOI{suffix}"
                 prefix = "Ky_Moi_Hop_Dong"
+            elif template_type == "phu_luc_cct_a":
+                tpl_name = "PHU_LUC_CHUYEN_CHU_THE_BEN_A.docx"
+                prefix = "Phu_Luc_CCT_A"
+            elif template_type == "phu_luc_cct_a_gia_han":
+                tpl_name = "PHU_LUC_CHUYEN_CHU_THE_BEN_A.docx"
+                prefix = "PL_CCT_A_GiaHan"
+            elif template_type == "phu_luc_cct":
+                tpl_name = "PHU_LUC_CHUYEN_CHU_THE.docx"
+                prefix = "Phu_Luc_CCT_B"
+            elif template_type == "phu_luc_cct_gia_han":
+                tpl_name = "PHU_LUC_CHUYEN_CHU_THE.docx"
+                prefix = "PL_CCT_B_GiaHan"
             else:
                 tpl_name = f"PHU_LUC_GIAM_GIA{suffix}"
                 prefix = "Doc"
                 
             template_path = os.path.join(WORKSPACE_DIR, "templates", tpl_name)
             
-            success, out_filename_or_err = generate_document_from_cloud(site_data, template_path, OUTPUT_DIR, prefix, template_type)
+            tpl_mapping_type = template_type
+            apply_ext = False
+            if template_type in ["phu_luc_gia_han", "phu_luc_gia_han_ngan_han", "phu_luc_giam_gia_gia_han", "phu_luc_giam_gia_gia_han_ngan_han"]:
+                apply_ext = True
+            elif template_type == "phu_luc_cct_a_gia_han":
+                tpl_mapping_type = "phu_luc_cct_a"
+                apply_ext = True
+            elif template_type == "phu_luc_cct_gia_han":
+                tpl_mapping_type = "phu_luc_cct"
+                apply_ext = True
+                
+            ext_years = extension_years if (extension_years and extension_years > 0) else (2 if "ngan_han" in template_type else 5)
+
+            success, out_filename_or_err = generate_document_from_cloud(
+                site_data, template_path, OUTPUT_DIR, prefix, tpl_mapping_type, apply_vb1245=apply_vb1245, apply_extension=apply_ext, extension_years=ext_years, custom_start_date=custom_start_date
+            )
             if success:
+                extra_files = []
+                if True:  # Always generate BBLV companion alongside contracts & amendments
+                    from utils.generate_bblv import generate_bblv_document
+                    try:
+                        bblv_filename = f"BBLV_{site_id}.docx"
+                        bblv_output_path = os.path.join(OUTPUT_DIR, bblv_filename)
+                        
+                        # Determine representative
+                        bblv_rep = representative
+                        if not bblv_rep:
+                            bblv_rep = "Lê Tân Cảng"
+                            progress_data = load_progress()
+                            if site_id in progress_data and "progress_tracker" in progress_data[site_id]:
+                                rep_confirmed = progress_data[site_id]["progress_tracker"].get("representative")
+                                if rep_confirmed:
+                                    bblv_rep = rep_confirmed
+                                    
+                        # Determine scenario
+                        bblv_scene = scenario
+                        if not bblv_scene or bblv_scene == "auto":
+                            # Default to follow the exact template type requested
+                            bblv_scene = template_type
+                            
+                        generate_bblv_document(site_data, bblv_rep, bblv_output_path, scenario=bblv_scene)
+                        extra_files.append(bblv_filename)
+                    except Exception as bblv_e:
+                        print(f"Warning: Failed to auto-generate BBLV companion file: {bblv_e}")
+                        
                 prog = _save_progress(template_type, out_filename_or_err)
-                return {"success": True, "filename": out_filename_or_err, "progress": prog}
+                cleanup_output_dir(max_keep=20)
+                return {"success": True, "filename": out_filename_or_err, "extra_files": extra_files, "progress": prog}
             raise HTTPException(status_code=500, detail=f"Lỗi khởi tạo tài liệu: {out_filename_or_err}")
         except HTTPException:
             raise
@@ -635,13 +905,198 @@ def generate_document(site_id: str, template_type: str = Body(..., embed=True)):
     else:
         raise HTTPException(status_code=501, detail=f"Template workflow '{template_type}' is registered but not yet implemented.")
 
+@app.post("/generate-bblv/{site_id}")
+def generate_bblv(site_id: str, data: BBLVRequest):
+    from utils.generate_bblv import generate_bblv_document
+    try:
+        sites = get_sites()
+        site_data = next((s for s in sites if s["site_id"] == site_id), None)
+        if not site_data:
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy dữ liệu cho trạm {site_id}")
+        
+        filename = f"BBLV_{site_id}.docx"
+        output_path = os.path.join(OUTPUT_DIR, filename)
+        
+        generate_bblv_document(site_data, data.representative, output_path, data.scenario)
+        
+        # Cập nhật tiến độ dự án
+        progress_data = load_progress()
+        if site_id not in progress_data:
+            progress_data[site_id] = {
+                "site_id": site_id,
+                "status": "Đầu việc",
+                "progress": {},
+                "last_updated": datetime.now().isoformat()
+            }
+        if "progress" not in progress_data[site_id]:
+            progress_data[site_id]["progress"] = {}
+        progress_data[site_id]["progress"]["draft_prepared"] = True
+        progress_data[site_id]["last_updated"] = datetime.now().isoformat()
+        save_progress(progress_data)
+        
+        config = load_config()
+        web_app_url = config.get("web_app_url", "")
+        if web_app_url:
+            sync_post_to_google_sheet_async(web_app_url, {site_id: progress_data[site_id]})
+            
+        return {"success": True, "filename": filename, "progress": progress_data[site_id]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/generate-bulk-bblv")
+def generate_bulk_bblv(data: BulkBBLVRequest):
+    site_ids = [s.strip().upper() for s in data.site_ids if s.strip()]
+    if not site_ids:
+        raise HTTPException(status_code=400, detail="Danh sách mã trạm trống.")
+    try:
+        sites = get_sites()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi tải dữ liệu: {e}")
+        
+    from utils.generate_bblv import generate_bblv_document
+    generated_files = []
+    errors = []
+    
+    progress_data = load_progress()
+    progress_to_sync = {}
+    
+    for site_id in site_ids:
+        site_data = next((s for s in sites if s["site_id"] == site_id), None)
+        if not site_data:
+            errors.append(f"🔴 {site_id}: Không tìm thấy thông tin trên Sheet")
+            continue
+        try:
+            filename = f"BBLV_{site_id}.docx"
+            output_path = os.path.join(OUTPUT_DIR, filename)
+            
+            generate_bblv_document(site_data, data.representative, output_path, data.scenario)
+            generated_files.append(filename)
+            
+            # Cập nhật tiến độ dự án
+            if site_id not in progress_data:
+                progress_data[site_id] = {
+                    "site_id": site_id,
+                    "status": "Đầu việc",
+                    "progress": {},
+                    "last_updated": datetime.now().isoformat()
+                }
+            if "progress" not in progress_data[site_id]:
+                progress_data[site_id]["progress"] = {}
+            progress_data[site_id]["progress"]["draft_prepared"] = True
+            progress_data[site_id]["last_updated"] = datetime.now().isoformat()
+            
+            progress_to_sync[site_id] = progress_data[site_id]
+        except Exception as e:
+            errors.append(f"🔴 {site_id}: Lỗi - {str(e)}")
+            
+    if not generated_files:
+        raise HTTPException(status_code=400, detail=f"Không xuất được biên bản nào. Chi tiết lỗi: {'; '.join(errors)}")
+        
+    save_progress(progress_data)
+    
+    config = load_config()
+    web_app_url = config.get("web_app_url", "")
+    if web_app_url and progress_to_sync:
+        sync_post_to_google_sheet_async(web_app_url, progress_to_sync)
+        
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    merged_filename = f"Bulk_BBLV_Combined_{timestamp}.docx"
+    merged_path = os.path.join(OUTPUT_DIR, merged_filename)
+    
+    import docx
+    from copy import deepcopy
+    
+    master_doc = None
+    for f in generated_files:
+        temp_path = os.path.join(OUTPUT_DIR, f)
+        doc = docx.Document(temp_path)
+        if master_doc is None:
+            master_doc = doc
+        else:
+            master_doc.add_page_break()
+            for element in doc.element.body:
+                if element.tag.endswith('sectPr'):
+                    continue
+                master_doc.element.body.append(deepcopy(element))
+                
+        try:
+            os.remove(temp_path)
+        except Exception:
+            pass
+            
+    if master_doc:
+        master_doc.save(merged_path)
+            
+    return {
+        "success": True, 
+        "filename": merged_filename, 
+        "count": len(generated_files), 
+        "errors": errors
+    }
+
+from urllib.parse import quote, unquote
+
 @app.get("/download/{filename}")
 def download_file(filename: str):
     """Serves compiled docx documents for downloading."""
-    file_path = os.path.join(OUTPUT_DIR, filename)
-    if os.path.exists(file_path):
-        return FileResponse(file_path, filename=filename, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-    raise HTTPException(status_code=404, detail="Requested file does not exist.")
+    clean_filename = unquote(filename)
+    file_path = os.path.join(OUTPUT_DIR, clean_filename)
+    if not os.path.exists(file_path):
+        # Fallback search if filename was passed without unquoting
+        file_path = os.path.join(OUTPUT_DIR, filename)
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Requested file does not exist.")
+        clean_filename = filename
+
+    media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    if clean_filename.endswith(".zip"):
+        media_type = "application/zip"
+
+    return FileResponse(
+        file_path, 
+        media_type=media_type,
+        filename=clean_filename,
+        headers={
+            "Access-Control-Expose-Headers": "Content-Disposition, Content-Length"
+        }
+    )
+
+@app.post("/open-folder")
+def open_output_folder():
+    """Opens the output directory in Windows File Explorer."""
+    try:
+        if not os.path.exists(OUTPUT_DIR):
+            os.makedirs(OUTPUT_DIR, exist_ok=True)
+        if sys.platform == "win32":
+            os.startfile(OUTPUT_DIR)
+        return {"success": True, "path": OUTPUT_DIR}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Không thể mở thư mục: {str(e)}")
+
+@app.post("/open-file")
+def open_file(filename: str = Body(..., embed=True)):
+    """Opens a generated document directly in Microsoft Word or default application."""
+    clean_filename = unquote(filename)
+    file_path = os.path.join(OUTPUT_DIR, clean_filename)
+    if not os.path.exists(file_path):
+        file_path = os.path.join(OUTPUT_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Tệp tin không tồn tại trong thư mục xuất.")
+    try:
+        if sys.platform == "win32":
+            os.startfile(file_path)
+        return {"success": True, "path": file_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Không thể mở tệp: {str(e)}")
+
+@app.post("/clean-output")
+def manual_clean_output():
+    """Dọn dẹp nhanh thư mục output, chỉ giữ 5 file gần nhất."""
+    cleanup_output_dir(max_keep=5)
+    return {"success": True, "message": "Đã dọn dẹp thư mục output gọn gàng!"}
+
 
 if __name__ == "__main__":
     import uvicorn

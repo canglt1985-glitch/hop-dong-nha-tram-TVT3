@@ -21,6 +21,7 @@ export interface Site {
     cot: number;
     giam_tru: number;
     cot_rounded: number;
+    vhkt?: number;
   };
   payment_cycle: string;
   to_vt: string;

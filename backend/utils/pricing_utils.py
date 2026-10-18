@@ -72,12 +72,22 @@ def calculate_pricing_breakdown(df: pd.DataFrame, r_idx: int, offset: int, loade
             other_items_raw_total += raw_val
             other_items_pay_total += pay_val
             
-    # Làm tròn hạng mục Cột (giống logic cloud_document_generator.py)
-    cot_price_pay = ((int(cot_raw) + int(giam_tru_raw)) // 50000) * 50000
-    
     # Layer 2: Temporary sum rounded down to nearest 50,000 for standard compliance (giá thuê mới làm tròn 50k)
-    temp_total = mb_raw + pm_raw + mfd_raw + cot_price_pay + other_items_raw_total
+    temp_total = mb_raw + pm_raw + mfd_raw + cot_raw + giam_tru_raw + other_items_raw_total
     new_price_val = (int(temp_total) // 50000) * 50000
+    
+    # Hạng mục Cột:
+    # 1. Nếu Vượt/Bằng khung (new_price_val >= temp_total): Giữ 100% giá trị quy định thực tế.
+    # 2. Nếu Dưới khung (new_price_val < temp_total): Giới hạn Mặt bằng <= mb_raw, phần chênh dồn vào Cột anten để Mặt bằng không vượt khung.
+    cot_raw_net = cot_raw + giam_tru_raw
+    if new_price_val >= temp_total:
+        cot_price_pay = cot_raw_net if cot_raw_net > 0 else 0
+    else:
+        desired_mb = mb_raw if mb_raw > 0 else 0
+        if desired_mb + pm_raw + mfd_raw + other_items_pay_total <= new_price_val:
+            cot_price_pay = max(0.0, new_price_val - desired_mb - pm_raw - mfd_raw - other_items_pay_total)
+        else:
+            cot_price_pay = 0.0
     
     # Trả về các thành phần nguyên gốc (không làm tròn)
     prices = {
@@ -97,45 +107,124 @@ def get_last_day_of_month(year: int, month: int) -> int:
     return calendar.monthrange(year, month)[1]
 
 
-def calculate_aligned_cycles(start_date_str: str, cycle_months: int, term_years: int, monthly_price: float) -> Dict:
+def calculate_aligned_cycles(
+    start_date_str: str, 
+    cycle_months: int, 
+    term_years: int, 
+    monthly_price: float, 
+    forced_end_date_str: str = None,
+    old_price: float = None,
+    split_date_str: str = "01/10/2025"
+) -> Dict:
     """
     Calculates aligned payment cycles and final contract end date.
     Cycle 1: From start_date to end of month after N months.
-    Contract End: Last day of the final month (Start + Term).
+    Contract End: Last day of the final month (Start + Term), or forced_end_date if provided.
+    Supports split pricing transition from old_price (before split_date) to monthly_price (from split_date onwards).
     """
     try:
         start_date = datetime.strptime(start_date_str, "%d/%m/%Y")
     except ValueError:
-        # Fallback if format is different
         try:
             start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
         except:
             return {"error": "Invalid date format"}
 
-    # 1. Calculate Contract End Date
-    is_exact_month_start = start_date.day == 1
-    end_year = start_date.year + term_years
-    
-    if is_exact_month_start:
-        # 01/06/2026 -> 31/05/2031
-        end_month = start_date.month - 1
-        if end_month == 0:
-            end_month = 12
-            end_year -= 1
+    if forced_end_date_str:
+        try:
+            final_contract_end = datetime.strptime(forced_end_date_str, "%d/%m/%Y")
+        except:
+            try:
+                final_contract_end = datetime.strptime(forced_end_date_str, "%Y-%m-%d")
+            except:
+                final_contract_end = start_date
     else:
-        # 09/04/2026 -> 30/04/2031
-        end_month = start_date.month
+        # Calculate Contract End Date if not forced
+        is_exact_month_start = start_date.day == 1
+        end_year = start_date.year + term_years
         
-    last_day = get_last_day_of_month(end_year, end_month)
-    final_contract_end = datetime(end_year, end_month, last_day)
+        if is_exact_month_start:
+            end_month = start_date.month - 1
+            if end_month == 0:
+                end_month = 12
+                end_year -= 1
+        else:
+            end_month = start_date.month
+            
+        last_day = get_last_day_of_month(end_year, end_month)
+        final_contract_end = datetime(end_year, end_month, last_day)
+
+    try:
+        split_date = datetime.strptime(split_date_str, "%d/%m/%Y")
+    except:
+        split_date = datetime(2025, 10, 1)
+
+    # Helper function to calculate a cycle's amount month-by-month
+    def get_cycle_amount(c_start, c_end):
+        if old_price is None or old_price <= 0 or old_price == monthly_price:
+            # Traditional calculation (consistent and fast)
+            is_exact = (c_start.day == 1) and (c_end.day == get_last_day_of_month(c_end.year, c_end.month))
+            if is_exact:
+                m_diff = (c_end.year - c_start.year) * 12 + (c_end.month - c_start.month) + 1
+                return round(monthly_price * m_diff)
+            else:
+                # Month-by-month calculation for partial start/end dates
+                total_cycle_amount = 0.0
+                curr = datetime(c_start.year, c_start.month, 1)
+                end_month_bound = datetime(c_end.year, c_end.month, 1)
+                while curr <= end_month_bound:
+                    m_start = max(c_start, curr)
+                    m_end_day = get_last_day_of_month(curr.year, curr.month)
+                    m_end = min(c_end, datetime(curr.year, curr.month, m_end_day))
+                    
+                    active_days = (m_end - m_start).days + 1
+                    total_days_in_month = m_end_day
+                    
+                    if active_days == total_days_in_month:
+                        total_cycle_amount += monthly_price
+                    else:
+                        total_cycle_amount += (monthly_price / float(total_days_in_month)) * active_days
+                        
+                    if curr.month == 12:
+                        curr = datetime(curr.year + 1, 1, 1)
+                    else:
+                        curr = datetime(curr.year, curr.month + 1, 1)
+                return round(total_cycle_amount)
+
+        # Split pricing month-by-month
+        total_cycle_amount = 0.0
+        curr = datetime(c_start.year, c_start.month, 1)
+        end_month_bound = datetime(c_end.year, c_end.month, 1)
+        
+        while curr <= end_month_bound:
+            # Active days of this month inside [c_start, c_end]
+            m_start = max(c_start, curr)
+            m_end_day = get_last_day_of_month(curr.year, curr.month)
+            m_end = min(c_end, datetime(curr.year, curr.month, m_end_day))
+            
+            active_days = (m_end - m_start).days + 1
+            total_days_in_month = m_end_day
+            
+            # Determine price for this month: old_price before split_date, new_price from split_date
+            current_month_price = old_price if m_start < split_date else monthly_price
+            
+            if active_days == total_days_in_month:
+                total_cycle_amount += current_month_price
+            else:
+                total_cycle_amount += (current_month_price / float(total_days_in_month)) * active_days
+                
+            # Move to next month
+            if curr.month == 12:
+                curr = datetime(curr.year + 1, 1, 1)
+            else:
+                curr = datetime(curr.year, curr.month + 1, 1)
+                
+        return round(total_cycle_amount)
 
     cycles = []
     current_start = start_date
     
     # Cycle 1: Align to end of month after cycle_months
-    # Logic: 
-    # - Nếu bắt đầu ngày 1: Kỳ 1 tròn cycle_months (VD: 01/05 -> 31/10)
-    # - Nếu bắt đầu ngày lẻ: Kỳ 1 = ngày lẻ + cycle_months (VD: 09/04 -> 31/10)
     is_exact_month_start = start_date.day == 1
     
     if is_exact_month_start:
@@ -151,23 +240,16 @@ def calculate_aligned_cycles(start_date_str: str, cycle_months: int, term_years:
     
     c1_end_day = get_last_day_of_month(c1_end_year, c1_end_month)
     c1_end_date = datetime(c1_end_year, c1_end_month, c1_end_day)
+    if c1_end_date > final_contract_end:
+        c1_end_date = final_contract_end
     
-    # Calculate Cycle 1 Price
-    if is_exact_month_start:
-        c1_total = round(monthly_price * cycle_months)
-    else:
-        days_in_start_month = get_last_day_of_month(start_date.year, start_date.month)
-        days_worked_in_start_month = days_in_start_month - start_date.day + 1
-        c1_price_partial = (monthly_price / 30) * days_worked_in_start_month
-        c1_price_full = monthly_price * cycle_months
-        c1_total = round(c1_price_partial + c1_price_full)
-    
+    c1_amt = get_cycle_amount(current_start, c1_end_date)
     cycles.append({
         "index": 1,
         "start": current_start.strftime("%d/%m/%Y"),
         "end": c1_end_date.strftime("%d/%m/%Y"),
-        "amount": c1_total,
-        "is_partial": True
+        "amount": c1_amt,
+        "is_partial": not is_exact_month_start
     })
     
     # Subsequent Cycles
@@ -175,11 +257,6 @@ def calculate_aligned_cycles(start_date_str: str, cycle_months: int, term_years:
     idx = 2
     
     while current_start < final_contract_end:
-        # Each subsequent cycle starts at 01 of month and ends at end of month after cycle_months
-        # But wait, the user said Kỳ 2 bắt đầu mùng 01 tháng sau.
-        # If C1 ends 31/10, C2 starts 01/11.
-        
-        # Calculate C(idx) end
         target_end_month_index = (current_start.month + cycle_months - 2) # 0-indexed month
         c_end_year = current_start.year + (target_end_month_index // 12)
         c_end_month = (target_end_month_index % 12) + 1
@@ -190,19 +267,13 @@ def calculate_aligned_cycles(start_date_str: str, cycle_months: int, term_years:
         # Check if we exceeded contract end
         if c_end_date > final_contract_end:
             c_end_date = final_contract_end
-            # Recalculate partial price if it's the last cycle and it's shorter
-            # For simplicity, assume user wants it aligned.
-            # But let's check if it's exactly cycle_months
-            months_diff = (c_end_date.year - current_start.year) * 12 + (c_end_date.month - current_start.month) + 1
-            c_total = monthly_price * months_diff
-        else:
-            c_total = monthly_price * cycle_months
             
+        c_amt = get_cycle_amount(current_start, c_end_date)
         cycles.append({
             "index": idx,
             "start": current_start.strftime("%d/%m/%Y"),
             "end": c_end_date.strftime("%d/%m/%Y"),
-            "amount": round(c_total),
+            "amount": c_amt,
             "is_partial": False
         })
         

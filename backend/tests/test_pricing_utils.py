@@ -1,4 +1,3 @@
-import pytest
 from utils.pricing_utils import get_last_day_of_month, calculate_aligned_cycles
 
 def test_get_last_day_of_month():

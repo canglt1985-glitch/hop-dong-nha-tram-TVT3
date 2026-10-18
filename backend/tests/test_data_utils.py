@@ -1,4 +1,3 @@
-import pytest
 from utils.data_utils import parse_numeric_value
 
 def test_parse_numeric_value_basic():

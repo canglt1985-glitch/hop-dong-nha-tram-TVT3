@@ -6,6 +6,7 @@ from docx.oxml.ns import qn
 import copy
 import calendar
 from utils.pricing_utils import calculate_aligned_cycles
+from utils.data_utils import format_date_vn
 
 def format_vn_currency(amount):
     try:
@@ -71,34 +72,31 @@ def replace_tag_in_runs(p, tag, replacement):
         replaced = True
     return replaced
 
-def calculate_contract_dates(expiry_date_val):
+def calculate_contract_dates(expiry_date_val, extension_years=5):
     try:
-        if isinstance(expiry_date_val, datetime): 
+        formatted_exp = format_date_vn(expiry_date_val)
+        if formatted_exp:
+            exp_date = datetime.strptime(formatted_exp, "%d/%m/%Y")
+        elif isinstance(expiry_date_val, datetime): 
             exp_date = expiry_date_val
         else:
-            date_str = str(expiry_date_val).strip()
-            try:
-                # Thử format DD/MM/YYYY
-                exp_date = datetime.strptime(date_str[:10], "%d/%m/%Y")
-            except ValueError:
-                # Thử format YYYY-MM-DD
-                exp_date = datetime.strptime(date_str[:10], "%Y-%m-%d")
+            exp_date = datetime(2026, 4, 9)
                 
         # Ngày bắt đầu HĐ mới = Ngày sau ngày hết hạn cũ
         start_date = exp_date + relativedelta(days=1)
         
         # Ngày kết thúc chuẩn hóa:
         is_exact_month_start = start_date.day == 1
-        target_end_year = start_date.year + 5
+        target_end_year = start_date.year + extension_years
         
         if is_exact_month_start:
-            # 01/06/2026 -> 31/05/2031
+            # 01/06/2026 -> 31/05/2031 (nếu 5 năm)
             target_end_month = start_date.month - 1
             if target_end_month == 0:
                 target_end_month = 12
                 target_end_year -= 1
         else:
-            # 09/04/2026 -> 30/04/2031
+            # 09/04/2026 -> 30/04/2031 (nếu 5 năm)
             target_end_month = start_date.month
             
         last_day = calendar.monthrange(target_end_year, target_end_month)[1]
@@ -106,9 +104,10 @@ def calculate_contract_dates(expiry_date_val):
         
         return start_date, end_date
     except Exception:
-        return datetime(2026, 4, 9), datetime(2031, 4, 30)
+        return datetime(2026, 4, 9), datetime(2026 + extension_years, 4, 30)
 
-def generate_document_from_cloud(site_data, template_path, output_dir, prefix, template_type=None):
+
+def generate_document_from_cloud(site_data, template_path, output_dir, prefix, template_type=None, apply_vb1245=True, apply_extension=False, extension_years=5, custom_start_date=None):
     site_id = site_data.get("site_id", "")
     owner_name = site_data.get("owner", "")
     
@@ -124,11 +123,8 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
     bank_branch = banking.get("bank_branch", "")
     full_bank_name = f"{bank_name} - {bank_branch}" if bank_branch else bank_name
 
-    # Calculate dates
-    raw_expiry = site_data.get("end_date", "")
-    start_date_dt, extended_end_date_dt = calculate_contract_dates(raw_expiry)
-    
     # Extract exact original end_date
+    raw_expiry = site_data.get("end_date", "")
     original_end_date_dt = None
     if raw_expiry:
         try:
@@ -139,11 +135,56 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
                 original_end_date_dt = datetime.strptime(str(raw_expiry)[:10], "%Y-%m-%d")
             except Exception:
                 pass
+
+    # Parse effective date
+    effective_str = site_data.get("effective_date", "")
+    eff_dt = None
+    if effective_str and str(effective_str).strip() not in ["nan", "None", "", "-"]:
+        try:
+            eff_dt = datetime.strptime(str(effective_str)[:10], "%d/%m/%Y")
+        except:
+            pass
+
+    # Prices calculation to determine price reduction
+    old_price_val = float(site_data.get("old_price") or 0)
+    provided_new_price = int(site_data.get("new_price", 0))
+    new_price_approx = provided_new_price if provided_new_price > 0 else old_price_val
+    has_reduction = (old_price_val > new_price_approx) and (new_price_approx > 0)
+
+    # Calculate default contract dates
+    start_date_dt, extended_end_date_dt = calculate_contract_dates(raw_expiry, extension_years)
+
+    # Check custom_start_date
+    if custom_start_date and str(custom_start_date).strip() not in ["", "nan", "None"]:
+        try:
+            formatted_c = format_date_vn(str(custom_start_date).strip())
+            if formatted_c:
+                start_date_dt = datetime.strptime(formatted_c, "%d/%m/%Y")
+                target_end_year = start_date_dt.year + extension_years
+                target_end_month = start_date_dt.month - 1 if start_date_dt.day == 1 else start_date_dt.month
+                if target_end_month == 0:
+                    target_end_month = 12
+                    target_end_year -= 1
+                last_day = calendar.monthrange(target_end_year, target_end_month)[1]
+                extended_end_date_dt = datetime(target_end_year, target_end_month, last_day)
+        except Exception as custom_err:
+            print(f"Warning: Failed to parse custom_start_date '{custom_start_date}': {custom_err}")
+    elif apply_vb1245 and has_reduction:
+        # Override start billing date for price reductions under VB1245
+        if eff_dt:
+            start_date_dt = eff_dt
+        else:
+            start_date_dt = datetime(2025, 10, 1)
+
+    # For pure reduction templates without extension, keep original contract expiry
+    if template_type == "phu_luc_giam_gia":
+        if original_end_date_dt:
+            extended_end_date_dt = original_end_date_dt
                 
     start_date_str = start_date_dt.strftime("%d/%m/%Y")
     end_date_str = extended_end_date_dt.strftime("%d/%m/%Y")
     
-    # Always use the extended 5-year date for the contract term in these templates
+    # Always use the extended 5-year date for the contract term in these templates unless overridden above
     end_contract_dt = extended_end_date_dt
     end_contract = end_contract_dt
     
@@ -162,65 +203,106 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
     giam_tru_raw = float(prices.get("giam_tru", 0))
     vhkt_raw = float(prices.get("vhkt", 0))
     
-    # 4. LOGIC LÀM TRÒN HAI LỚP (Theo yêu cầu: 1256000 còn 1250000)
-    # Lớp 1: Làm tròn hạng mục Cột (bao gồm giảm trừ dùng chung)
-    cot_price_pay = ((int(cot_raw) + int(giam_tru_raw)) // 50000) * 50000
-    vhkt_price_pay = (int(vhkt_raw) // 50000) * 50000 if vhkt_raw > 0 else 0
-    
-    # Lớp 2: Tính tổng tạm thời và làm tròn xuống cho TỔNG CHỐT
-    temp_total = mb_raw + pm_raw + mfd_raw + cot_price_pay + vhkt_price_pay
+    # Lớp 2: Tính tổng quy định khung ban đầu
+    temp_total = mb_raw + pm_raw + mfd_raw + cot_raw + giam_tru_raw + vhkt_raw
     
     provided_new_price = int(site_data.get("new_price", 0))
     if provided_new_price > 0:
         new_price_val = provided_new_price
     else:
         # If pure extension, keep old price
-        if template_type == "phu_luc_gia_han":
-            new_price_val = float(site_data.get("old_price", 0) or 0)
+        if template_type in ["phu_luc_gia_han", "phu_luc_gia_han_ngan_han"]:
+            new_price_val = (int(site_data.get("old_price", 0) or 0) // 50000) * 50000
         else:
             new_price_val = (int(temp_total) // 50000) * 50000
-    
-    # Lớp 3: Làm tròn phòng máy và dồn phần còn lại vào Mặt bằng
-    pm_price_pay = (int(pm_raw) // 50000) * 50000 if pm_raw > 0 else 0
-    mfd_price_pay = (int(mfd_raw) // 50000) * 50000 if mfd_raw > 0 else 0
-    mb_price_pay = new_price_val - pm_price_pay - mfd_price_pay - cot_price_pay - vhkt_price_pay
+            
+    # LOGIC CHIA PHÂN BỔ HẠNG MỤC:
+    # 1. Nếu Vượt/Bằng khung quy định (new_price_val >= temp_total):
+    #    Các hạng mục phụ (Cột, PM, MFĐ, VHKT) giữ 100% giá trị quy định thực tế.
+    #    Mặt bằng nhận phần còn lại (vượt khung dồn vào mặt bằng).
+    # 2. Nếu Dưới khung quy định (new_price_val < temp_total):
+    #    Các hạng mục phụ (PM, MFĐ, VHKT) giữ nguyên giá quy định.
+    #    Mặt bằng được giới hạn tối đa là mb_raw (không được vượt khung QĐ02).
+    #    Phần chênh lệch dưới khung được dồn sang Cột anten để không hạng mục nào bị vượt khung.
+    cot_raw_net = cot_raw + giam_tru_raw
+    if new_price_val >= temp_total:
+        cot_price_pay = cot_raw_net if cot_raw_net > 0 else 0
+        vhkt_price_pay = vhkt_raw if vhkt_raw > 0 else 0
+        pm_price_pay = pm_raw if pm_raw > 0 else 0
+        mfd_price_pay = mfd_raw if mfd_raw > 0 else 0
+        mb_price_pay = new_price_val - pm_price_pay - mfd_price_pay - cot_price_pay - vhkt_price_pay
+    else:
+        vhkt_price_pay = vhkt_raw if vhkt_raw > 0 else 0
+        pm_price_pay = pm_raw if pm_raw > 0 else 0
+        mfd_price_pay = mfd_raw if mfd_raw > 0 else 0
+        
+        # Mặt bằng lấy tối đa bằng mb_raw (không được vượt khung mb_raw khi tổng không vượt)
+        desired_mb = mb_raw if mb_raw > 0 else 0
+        if desired_mb + pm_price_pay + mfd_price_pay + vhkt_price_pay <= new_price_val:
+            mb_price_pay = desired_mb
+            cot_price_pay = max(0.0, new_price_val - mb_price_pay - pm_price_pay - mfd_price_pay - vhkt_price_pay)
+        else:
+            mb_price_pay = max(0.0, new_price_val - pm_price_pay - mfd_price_pay - vhkt_price_pay)
+            cot_price_pay = 0.0
 
     
     new_price_str = format_vn_currency(new_price_val)
     new_price_text = number_to_vietnamese_words(new_price_val) + " đồng"
     
-    # Calculate Deduction Text
+    # PRICE_PHRASING calculation based on difference between old_price and new_price
+    old_price_val = float(site_data.get("old_price") or 0)
+    if not apply_vb1245 or template_type in ["phu_luc_gia_han", "phu_luc_gia_han_ngan_han"]:
+        price_phrasing = f"{new_price_str} đồng/tháng (bằng chữ: {new_price_text})"
+    elif old_price_val > new_price_val:
+        old_price_str = format_vn_currency(old_price_val)
+        price_phrasing = f"giảm từ {old_price_str} đồng/tháng xuống còn {new_price_str} đồng/tháng (bằng chữ: {new_price_text})"
+    elif old_price_val < new_price_val and old_price_val > 0:
+        old_price_str = format_vn_currency(old_price_val)
+        price_phrasing = f"tăng từ {old_price_str} đồng/tháng lên {new_price_str} đồng/tháng (bằng chữ: {new_price_text})"
+    else:
+        price_phrasing = f"{new_price_str} đồng/tháng (bằng chữ: {new_price_text})"
+
+    
+    # Calculate Deduction Text & Paid Info
     deduction_text = ""
     total_deduction = 0
-    paid_until = str(site_data.get("paid_until_date", "")).strip()
-    if paid_until and paid_until not in ["nan", "None"]:
+    paid_until_raw = site_data.get("paid_until_date", "")
+    paid_until = format_date_vn(paid_until_raw)
+    paid_dt = None
+    if paid_until:
         try:
-            paid_dt = datetime.strptime(paid_until[:10], "%d/%m/%Y")
-            start_dt = datetime(2025, 10, 1)
-            if paid_dt >= start_dt:
-                # Calculate number of months overpaid
-                # We add 1 day to paid_dt to make it the 1st of the next month (e.g. 31/10/2025 -> 01/11/2025)
-                # so relativedelta returns exact months without fractions if it's a full month.
-                paid_dt_adjusted = paid_dt + relativedelta(days=1)
-                diff = relativedelta(paid_dt_adjusted, start_dt)
-                months_overpaid = diff.years * 12 + diff.months + (diff.days / 30.0)
-                
-                # Calculate amount diff per month
-                old_p = float(site_data.get("old_price", 0) or 0)
-                new_p = float(new_price_val)
-                diff_per_month = old_p - new_p
-                
-                if diff_per_month > 0 and months_overpaid > 0:
-                    total_deduction = diff_per_month * months_overpaid
-                    deduction_text = f"Giảm trừ số tiền {format_vn_currency(total_deduction)} đồng đã thanh toán từ 01/10/2025 đến {paid_until} vào kỳ thanh toán tiếp theo."
-                else:
-                    deduction_text = f"Giảm trừ số tiền đã thanh toán từ 01/10/2025 đến {paid_until} vào kỳ thanh toán tiếp theo."
+            paid_dt = datetime.strptime(paid_until, "%d/%m/%Y")
         except Exception:
-            deduction_text = f"Giảm trừ số tiền đã thanh toán từ 01/10/2025 đến {paid_until} vào kỳ thanh toán tiếp theo."
+            pass
+
+    if paid_dt and apply_vb1245:
+        start_dt = datetime(2025, 10, 1)
+        if paid_dt >= start_dt:
+            # ONLY compute retroactive deduction for CSHT
+            site_type_val = str(site_data.get("site_type", "")).strip().upper()
+            is_mbf = "MBF" in site_type_val or "MOBIFONE" in site_type_val or "MAT" in site_type_val or "MẶT" in site_type_val
+            
+            if not is_mbf:
+                try:
+                    paid_dt_adjusted = paid_dt + relativedelta(days=1)
+                    diff = relativedelta(paid_dt_adjusted, start_dt)
+                    months_overpaid = diff.years * 12 + diff.months + (diff.days / 30.0)
+                    
+                    old_p = float(site_data.get("old_price", 0) or 0)
+                    new_p = float(new_price_val)
+                    diff_per_month = old_p - new_p
+                    
+                    if diff_per_month > 0 and months_overpaid > 0:
+                        total_deduction = diff_per_month * months_overpaid
+                        deduction_text = f"Giảm trừ số tiền {format_vn_currency(total_deduction)} đồng đã thanh toán từ 01/10/2025 đến {paid_until} vào kỳ thanh toán tiếp theo."
+                    else:
+                        deduction_text = f"Giảm trừ số tiền đã thanh toán từ 01/10/2025 đến {paid_until} vào kỳ thanh toán tiếp theo."
+                except Exception:
+                    deduction_text = f"Giảm trừ số tiền đã thanh toán từ 01/10/2025 đến {paid_until} vào kỳ thanh toán tiếp theo."
     
     # Generate CSHT List dynamically
     csht_list = (
-        "- Vị trí đặt thiết bị: phòng có sẵn của chủ trạm, diện tích 3x3m, theo tiêu chuẩn của MobiFone.\n"
+        "Vị trí đặt thiết bị: phòng có sẵn của chủ trạm, diện tích 3x3m, theo tiêu chuẩn của MobiFone.\n"
         "- Vị trí đặt máy nổ: phòng có sẵn của chủ trạm, diện tích 3mx2m, theo tiêu chuẩn của MobiFone.\n"
         "- Cột anten: cột dây co dưới mặt đất cao 36m có sẵn của chủ trạm.\n"
         "- Hệ thống tiếp đất và hệ thống lạnh: MobiFone tự trang bị."
@@ -228,12 +310,28 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
 
     # For pure extension, remove certificate basis
     hs_phap_ly = site_data.get("hs_phap_ly", "")
-    if template_type == "phu_luc_gia_han":
+    if template_type in ["phu_luc_gia_han", "phu_luc_gia_han_ngan_han"]:
         certificate_text = ""
     else:
         certificate_text = hs_phap_ly if hs_phap_ly and hs_phap_ly != "nan" else "................................................................................................................................"
 
+    # Compute dynamic subject reason
+    site_type_val = str(site_data.get("site_type", "")).strip().upper()
+    is_mbf = "MBF" in site_type_val or "MOBIFONE" in site_type_val
+    subject_target = "mặt bằng" if is_mbf else "cơ sở hạ tầng"
+
+    if template_type == "phu_luc_giam_gia":
+        ly_do = f"điều chỉnh giá thuê {subject_target}"
+    elif template_type in ["phu_luc_gia_han", "phu_luc_gia_han_ngan_han"]:
+        ly_do = f"gia hạn thời gian thuê {subject_target}"
+    elif template_type in ["phu_luc_giam_gia_gia_han", "phu_luc_giam_gia_gia_han_ngan_han"]:
+        ly_do = "gia hạn thời gian và điều chỉnh điều khoản"
+    else:
+        ly_do = ""
+
     replacements = {
+        "{{LY_DO}}": ly_do,
+        "{{ LY_DO }}": ly_do,
         "{{CERTIFICATE}}": certificate_text,
         "{{ CERTIFICATE }}": certificate_text,
         "{{SITE_ID}}": site_id,
@@ -245,12 +343,16 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
         "{{ CONTRACT_DATE }}": "",
         "{{ADDRESS_OLD}}": address_old,
         "{{ ADDRESS_OLD }}": address_old,
+        "{{ADDRESS_OLD{{ADDRESS_NEW}}": f"{address_old} ({site_data.get('address_new', '')})",
+        "{{ADDRESS_OLD{{ADDRESS_NEW}} }": f"{address_old} ({site_data.get('address_new', '')})",
         "{{ADDRESS_NEW}}": site_data.get("address_new", ""),
         "{{ ADDRESS_NEW }}": site_data.get("address_new", ""),
         " ({{ADDRESS_NEW}})": f" ({site_data.get('address_new')})" if site_data.get("address_new") and site_data.get("address_new") != "nan" else "",
         " ({{ ADDRESS_NEW }})": f" ({site_data.get('address_new')})" if site_data.get("address_new") and site_data.get("address_new") != "nan" else "",
         "{{LONGITUDE}}": longitude,
+        "{{LONGITUDE }}": longitude,
         "{{LATITUDE}}": latitude,
+        "{{LATITUDE }}": latitude,
         "{{CERTIFICATE}}": certificate_text,
         "{{ CERTIFICATE }}": certificate_text,
         "{{LEGAL_DOCS}}": certificate_text,
@@ -261,6 +363,9 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
         "{{ NEW_PRICE }}": new_price_str,
         "{{NEW_PRICE_TEXT}}": new_price_text,
         "{{ NEW_PRICE_TEXT }}": new_price_text,
+        "{{PRICE_PHRASING}}": price_phrasing,
+        "{{ PRICE_PHRASING }}": price_phrasing,
+
         "{{ACCOUNT_OWNER}}": account_owner,
         "{{ ACCOUNT_OWNER }}": account_owner,
         "{{ACCOUNT_NO}}": account_no,
@@ -295,8 +400,8 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
         "{{ GIAM_TRU }}": format_vn_currency(giam_tru_raw),
         "{{COT_CHOT}}": format_vn_currency(cot_price_pay),
         "{{ COT_CHOT }}": format_vn_currency(cot_price_pay),
-        "{{TL_COT}}": f"{((cot_price_pay / (cot_raw + giam_tru_raw)) - 1) * 100:.2f}%" if (cot_raw + giam_tru_raw) != 0 else "0%",
-        "{{ TL_COT }}": f"{((cot_price_pay / (cot_raw + giam_tru_raw)) - 1) * 100:.2f}%" if (cot_raw + giam_tru_raw) != 0 else "0%",
+        "{{TL_COT}}": f"{((cot_price_pay / cot_raw_net) - 1) * 100:.2f}%" if cot_raw_net != 0 else "0%",
+        "{{ TL_COT }}": f"{((cot_price_pay / cot_raw_net) - 1) * 100:.2f}%" if cot_raw_net != 0 else "0%",
         
         "{{VHKT_1245}}": format_vn_currency(vhkt_raw),
         "{{ VHKT_1245 }}": format_vn_currency(vhkt_raw),
@@ -341,7 +446,27 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
         "{{OWNER_MATCH}}": banking.get("match_status_text", ""),
         "{{ OWNER_MATCH }}": banking.get("match_status_text", ""),
         "{{EXTENSION_STATUS}}": site_data.get("ext_status", ""),
-        "{{ EXTENSION_STATUS }}": site_data.get("ext_status", "")
+        "{{ EXTENSION_STATUS }}": site_data.get("ext_status", ""),
+        
+        # Party A Owner Transition specific placeholders
+        "{{ OWNER_OLD_NAME }}": owner_name,
+        "{{ OWNER_NEW_NAME }}": site_data.get("new_owner_info", {}).get("name") or "................................",
+        "{{ OWNER_OLD_ADDRESS }}": address_old,
+        "{{ OWNER_NEW_ADDRESS }}": site_data.get("new_owner_info", {}).get("address") or "................................",
+        "{{ OWNER_OLD_PHONE }}": site_data.get("phone") or "................",
+        "{{ OWNER_NEW_PHONE }}": site_data.get("new_owner_info", {}).get("phone") or "................",
+        "{{ OWNER_OLD_CCCD }}": "................................................",
+        "{{ OWNER_NEW_CCCD }}": "................................................",
+        "{{ OWNER_OLD_ACCOUNT_NO }}": account_no or "................",
+        "{{ OWNER_NEW_ACCOUNT_NO }}": site_data.get("new_owner_info", {}).get("bank_no") or "................",
+        "{{ OWNER_OLD_BANK }}": full_bank_name or "................",
+        "{{ OWNER_NEW_BANK }}": site_data.get("new_owner_info", {}).get("bank_name") or "................",
+        "{{ EFFECTIVE_DATE }}": site_data.get("effective_date") or "................",
+        "{{ ATTACHMENT_DEATH_CERT }}": "trích lục khai tử ................................................",
+        "{{ ATTACHMENT_LAND_CERT }}": "chứng nhận quyền sử dụng đất số ................................................",
+        "{{ ATTACHMENT_DESIRE_LETTER }}": "đơn đề nghị chuyển tên ngày ................................",
+        "{{ LAND_ADDRESS }}": site_data.get("address_new") or address_old or "................................................",
+        "{{ SITE_CODE }}": site_data.get("site_code") or site_id or "........"
     }
 
     doc = docx.Document(template_path)
@@ -354,15 +479,19 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
                 p_element.getparent().remove(p_element)
                 p._p = p._element = None
     
-    # 5. GENERATE PAYMENT TABLE (Logic mới: Dồn ngày lẻ vào Kỳ 1)
+    # 5. GENERATE PAYMENT TABLE (Dồn ngày lẻ vào Kỳ 1 và căn chỉnh chu kỳ 6 tháng)
     periods = []
     total_amount = 0
     cycle_months = 6
-    term_years = 5
+    term_years = extension_years
 
-    # Lấy thông tin chu kỳ từ hàm tập trung
-    # start_date_str đã được định nghĩa ở trên là start_date_dt.strftime("%d/%m/%Y")
-    result = calculate_aligned_cycles(start_date_str, cycle_months, term_years, new_price_val)
+    # Lấy thông tin chu kỳ từ paid_dt (nếu có và áp dụng VB1245 không có custom_start_date) hoặc start_date_str
+    if paid_dt and apply_vb1245 and (not custom_start_date or str(custom_start_date).strip() in ["", "nan", "None"]):
+        table_start_str = (paid_dt + relativedelta(days=1)).strftime("%d/%m/%Y")
+    else:
+        table_start_str = start_date_str
+
+    result = calculate_aligned_cycles(table_start_str, cycle_months, term_years, new_price_val, forced_end_date_str=end_date_str, old_price=old_price_val)
     
     if "cycles" in result:
         for c in result["cycles"]:
@@ -380,6 +509,8 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
             total_amount += amt
         
         end_contract = datetime.strptime(result["end_date"], "%d/%m/%Y")
+        replacements["{{START_DATE}}"] = result["start_date"]
+        replacements["{{ START_DATE }}"] = result["start_date"]
         replacements["{{END_DATE}}"] = result["end_date"]
         replacements["{{TOTAL_AMOUNT}}"] = format_vn_currency(total_amount)
         replacements["{{ TOTAL_AMOUNT }}"] = format_vn_currency(total_amount)
@@ -389,7 +520,9 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
     import re
     
     has_page_broken = False
-    for p in doc.paragraphs:
+    republic_count = 0
+    paragraphs = list(doc.paragraphs)
+    for idx, p in enumerate(paragraphs):
         if "Tổng cộng:" in p.text:
             if re.search(r'[\d\.]+', p.text):
                 p.text = total_replacement
@@ -397,21 +530,133 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
                 for run in p.runs:
                     run.font.name = "Times New Roman"
                     run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
-                    run.font.size = docx.shared.Pt(14)
+                    run.font.size = docx.shared.Pt(13)
                 continue
                 
+        if template_type in ["phu_luc_gia_han", "phu_luc_gia_han_ngan_han"]:
+            if "Đơn giá thuê trước đàm phán" in p.text:
+                if p._element is not None:
+                    p.text = f"- Đơn giá thuê không đổi: {{{{NEW_PRICE}}}} đồng/tháng ( đã bao gồm thuế VAT)\n- Thời gian thuê: đến {{{{END_DATE}}}} ( thêm {extension_years} năm)\n- Chu kỳ thanh toán: 06 tháng/lần vào đầu kỳ"
+                    for run in p.runs:
+                        run.font.name = "Times New Roman"
+                        try: run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
+                        except Exception: pass
+                        run.font.size = docx.shared.Pt(13)
+            elif "Đơn giá thuê sau đàm phán" in p.text:
+                if p._element is not None:
+                    p_element = p._element
+                    p_element.getparent().remove(p_element)
+                    p._p = p._element = None
+                continue
+
+        # Tự động thêm dòng lý do đề xuất trình vượt giá mặt bằng so với quy định vào Tờ trình nếu giá mặt bằng vượt khung (mb_price_pay > mb_raw)
+        if mb_price_pay > mb_raw and not getattr(doc, '_already_inserted_mb_overframe_reason', False):
+            if "Kính trình Phó Giám đốc" in p.text or "Thời gian áp dụng giá thuê mới" in p.text:
+                doc._already_inserted_mb_overframe_reason = True
+                try:
+                    reason_text = f"- Lý do đề xuất trình vượt giá mặt bằng so với qui định: trạm {site_id} là phục vụ Trạm dừng chân cao tốc Long Thành – Dầu Giây có lưu lượng cao. Các trạm gần nhất cách 1.8km đến 2.3km nên vùng phủ khu vực này rất thưa. Vì vậy, nếu phải di dời hoặc hủy trạm {site_id} sẽ ảnh hưởng đến khách hàng và tốn kém chi phí di dời."
+                    p_reason = p.insert_paragraph_before(reason_text)
+                    p_reason.style = p.style
+                    for run in p_reason.runs:
+                        run.font.name = "Times New Roman"
+                        try: run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
+                        except Exception: pass
+                        run.font.size = docx.shared.Pt(13)
+                except Exception: pass
+
+        # Add extension line to Tờ trình proposal list
+        if apply_extension and not getattr(doc, '_already_inserted_proposal_ext', False):
+            is_target_p = False
+            if "Đơn giá thuê sau đàm phán" in p.text and template_type not in ["phu_luc_gia_han", "phu_luc_gia_han_ngan_han"]:
+                is_target_p = True
+            elif "Phụ lục này có hiệu lực từ ngày" in p.text and template_type in ["phu_luc_cct_a", "phu_luc_cct"]:
+                is_target_p = True
+                
+            if is_target_p:
+                doc._already_inserted_proposal_ext = True
+                try:
+                    next_p = paragraphs[idx + 1] if (idx + 1) < len(paragraphs) else p
+                    p_ext = next_p.insert_paragraph_before(f"gia hạn hợp đồng đến ngày {end_date_str}")
+                    p_ext.style = p.style
+                    for run in p_ext.runs:
+                        run.font.name = "Times New Roman"
+                        try: run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
+                        except Exception: pass
+                        run.font.size = docx.shared.Pt(13)
+                except Exception: pass
+
+        # General extension clause insertion for any template where apply_extension is True
+        if apply_extension and "Điều chỉnh điều 3" in p.text:
+            if p._element is not None and not getattr(p, '_already_inserted_term_ext', False):
+                p._already_inserted_term_ext = True
+                try:
+                    p1 = p.insert_paragraph_before("•\tĐiều chỉnh điều 2: Thời hạn cho thuê")
+                    for run in p1.runs:
+                        run.font.name = "Times New Roman"
+                        try: run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
+                        except Exception: pass
+                        run.font.size = docx.shared.Pt(13)
+                        run.bold = True
+                    p2 = p.insert_paragraph_before(f"Bổ sung thêm khoản\t: gia hạn hợp đồng đến ngày {end_date_str}")
+                    for run in p2.runs:
+                        run.font.name = "Times New Roman"
+                        try: run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
+                        except Exception: pass
+                        run.font.size = docx.shared.Pt(13)
+                except Exception: pass
+                
+
+
+        if template_type in ["phu_luc_cct_a", "phu_luc_cct"] and apply_extension:
+            if "Phụ lục này có hiệu lực từ ngày" in p.text:
+                if p._element is not None and not getattr(p, '_already_inserted_term', False):
+                    p._already_inserted_term = True
+                    try:
+                        p1 = p.insert_paragraph_before(f"Gia hạn thời hạn cho thuê: Bổ sung thêm khoảng thời gian gia hạn từ ngày {start_date_str} đến {end_date_str}")
+                        for run in p1.runs:
+                            run.font.name = "Times New Roman"
+                            try: run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
+                            except Exception: pass
+                            run.font.size = docx.shared.Pt(13)
+                    except Exception: pass
+
+        # Xử lý tự động câu chữ và ngày hiệu lực cho dòng "Thời gian áp dụng..." trong Tờ trình
+        if "Thời gian áp dụng giá thuê mới" in p.text or "Thời gian áp dụng:" in p.text:
+            if not apply_vb1245 or not has_reduction or template_type in ["phu_luc_gia_han", "phu_luc_gia_han_ngan_han"]:
+                p.text = f"- Thời gian áp dụng: Kể từ ngày {start_date_str}."
+            else:
+                p.text = f"- Thời gian áp dụng giá thuê mới: Kể từ ngày {start_date_str}."
+            for run in p.runs:
+                run.font.name = "Times New Roman"
+                try: run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
+                except Exception: pass
+                run.font.size = docx.shared.Pt(13)
+
+        # Xóa trùng lặp 2 dấu gạch ngang "- - " ở đầu đoạn văn nếu có
+        if p.text.startswith("- - "):
+            p.text = "- " + p.text[4:].strip()
+        elif p.text.startswith("-  - "):
+            p.text = "- " + p.text[5:].strip()
+
         text = p.text
         original_text = text
+        import re
+        if "Giảm từ" in text or "giảm từ" in text:
+            # Replace the hardcoded string from the template with dynamic PRICE_PHRASING
+            text = re.sub(r"Gi[aả]m từ \{\{OLD_PRICE\}\}.*?\{\{NEW_PRICE_TEXT\}\}\)", "{{PRICE_PHRASING}}", text, flags=re.IGNORECASE)
+            
         for tag, rep in replacements.items():
             if tag in text:
                 text = text.replace(tag, str(rep))
                 
         if text != original_text:
             p.text = text
+            if "{{CSHT_LIST" in original_text or "{{ CSHT_LIST" in original_text:
+                p.paragraph_format.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.LEFT
             for run in p.runs:
                 run.font.name = "Times New Roman"
                 run._element.rPr.rFonts.set(qn('w:eastAsia'), "Times New Roman")
-                run.font.size = docx.shared.Pt(14)
+                run.font.size = docx.shared.Pt(13)
                 
         bold_triggers = [
             "Thời điểm bắt đầu tính tiền",
@@ -432,6 +677,11 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
         if not has_page_broken and any(trigger in p.text.upper() for trigger in signature_triggers):
             p.paragraph_format.page_break_before = True
             has_page_broken = True
+            
+        if "CỘNG HÒA XÃ HỘI" in p.text.upper() or "CỘNG HOÀ XÃ HỘI" in p.text.upper():
+            republic_count += 1
+            if republic_count > 1:
+                p.paragraph_format.page_break_before = True
             
         if any(trigger in p.text for trigger in bold_triggers) or (owner_name and p.text.strip() == owner_name.strip()):
             for run in p.runs:
@@ -468,10 +718,12 @@ def generate_document_from_cloud(site_data, template_path, output_dir, prefix, t
                 pay_table = table
                 break
                 
-    if pay_table is None and len(doc.tables) > 8:
-        pay_table = doc.tables[8]
+    if pay_table is None:
+        is_phu_luc = template_type and "phu_luc" in str(template_type).lower()
         if is_phu_luc and len(doc.tables) > 4:
             pay_table = doc.tables[4] # Usually table 4 in Phu Luc template
+        elif len(doc.tables) > 8:
+            pay_table = doc.tables[8]
             
     if pay_table:
         try:

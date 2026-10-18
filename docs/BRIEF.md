@@ -1,50 +1,33 @@
-# 💡 BRIEF: Manual Price Breakdown & Logic Refinement
+# 💡 BRIEF: Luồng xử lý đàm phán trạm hết hạn (Ví dụ: DNCM38)
 
-**Ngày tạo:** 2026-05-11
-**Brainstorm cùng:** canglt1985
+**Ngày tạo:** 14/05/2026
+**Brainstorm cùng:** Kỹ sư / Quản lý trạm
 
 ---
 
 ## 1. VẤN ĐỀ CẦN GIẢI QUYẾT
-- Dữ liệu đơn giá từ Google Sheets/Excel đôi khi bị cũ hoặc sai lệch hạng mục (Mặt bằng, MPĐ, Cột anten...).
-- Hiện tại app chỉ cho nhập "Tổng đơn giá chốt", khiến các hạng mục con trong file Word bị tính toán sai dựa trên data cũ.
-- Người dùng muốn nhập tay trực tiếp 4 hạng mục chính để kiểm soát hoàn toàn con số trong hợp đồng.
-- **Mới:** Kỳ thanh toán hiện tại bị lẻ ngày (ví dụ bắt đầu từ 09/04), gây khó khăn cho kế toán theo dõi dòng tiền theo tháng tròn.
-- **Mới:** Ngày kết thúc hợp đồng cần được chuẩn hóa về cuối tháng của năm kết thúc để đồng bộ với chu kỳ thanh toán.
+Trạm (ví dụ DNCM38) chuẩn bị hết hạn hợp đồng (30/11/2026). Khi đàm phán thành công với chủ nhà, tuỳ thuộc vào thoả thuận sẽ có các phương án thời hạn & giá khác nhau. Cần quy hoạch rõ cách thức hệ thống tự động sinh văn bản (Phụ lục/Hợp đồng) cho từng ngã rẽ này, mà không làm phình to hoặc rối giao diện người dùng.
 
 ## 2. GIẢI PHÁP ĐỀ XUẤT
-- Thêm Panel **"Phân rã đơn giá thủ công"** trong phần cập nhật số liệu.
-- Áp dụng logic làm tròn 50k tự động và dồn tiền vào mục "Mặt bằng" để khớp tổng giá chốt.
-- **Logic Chu kỳ thanh toán (Option A):**
-    - **Kỳ 1:** Dồn tất cả ngày lẻ vào kỳ đầu tiên. Kỳ 1 sẽ kết thúc vào ngày cuối cùng (30/31) của tháng thứ N (N là chu kỳ, ví dụ 6 tháng).
-    - **Kỳ 2 trở đi:** Bắt đầu từ ngày 01 của tháng kế tiếp để đảm bảo tròn tháng.
-- **Logic Ngày kết thúc:** Ngày kết thúc hợp đồng = Ngày cuối cùng (30/31) của tháng kết thúc (Start Date + Term Months).
-- **Quy tắc làm tròn:** Chỉ làm tròn ở **Đơn giá** (Unit Price). Phần **Thành tiền** (Total Amount) của kỳ lẻ cứ tính chính xác đến số thập phân (số lẻ).
+Tận dụng triệt để hệ thống template đã có sẵn và các tuỳ chọn xuất file hiện tại trên giao diện. Giải quyết bài toán bằng cách điều phối đúng luồng dữ liệu vào 3 kịch bản xuất file mà không cần chế thêm nút bấm mới:
+1. Áp dụng xuất file loại Giảm Giá.
+2. Áp dụng xuất file loại Gia hạn kèm giảm giá.
+3. Áp dụng xuất file loại Thanh lý ký lại hợp đồng.
 
 ## 3. ĐỐI TƯỢNG SỬ DỤNG
-- **Primary:** Tổ đàm phán (cần chốt số liệu chính xác để in hợp đồng).
+- **Primary:** Nhân viên quản lý trạm / Người trực tiếp xuất hợp đồng, phụ lục.
+- **Secondary:** Quản lý đối soát hợp đồng.
 
-## 4. TÍNH NĂNG
+## 4. TÍNH NĂNG & KỊCH BẢN (MVP)
 
-### 🚀 MVP (Bắt buộc có):
-- [ ] **Giao diện nhập liệu:** 4 ô nhập (Mặt bằng, MPĐ, Cột anten, Giảm trừ).
-- [ ] **Auto-calc Total:** Tự động tính tổng khi nhập các hạng mục.
-- [ ] **Smart Rounding:** Tự động làm tròn tổng xuống nấc 50,000đ (VD: 3.956.000 -> 3.950.000).
-- [ ] **Balance Logic:** Tự động điều chỉnh mục "Mặt bằng" sau khi làm tròn để Tổng khớp tuyệt đối.
-- [ ] **End-of-Month Alignment:**
-    - [ ] Tính toán Kỳ 1 kết thúc vào cuối tháng.
-    - [ ] Tính toán Kỳ 2+ bắt đầu từ ngày 01.
-    - [ ] Tự động xác định ngày kết thúc hợp đồng là cuối tháng (VD: 09/04/2026 -> 5 năm -> 30/04/2031).
-- [ ] **Persistence:** Lưu breakdown vào `progress_tracker.json`.
-
-### 🎁 Phase 2 (Làm sau):
-- [ ] **Template Mapping:** Tự động điền các con số này vào các thẻ `{{P_MB}}`, `{{P_MFD}}`, `{{COT_CHOT}}` trong Word.
+### 🚀 MVP (Quy hoạch 3 luồng):
+- [ ] **Kịch bản 1 - Chỉ giảm giá:** Chọn xuất file giảm giá. Thời điểm áp dụng giảm giá cho đến đúng ngày hết hạn cũ (30/11/2026).
+- [ ] **Kịch bản 2 - Gia hạn & Giảm giá:** Gắn thêm tệp gia hạn. Hệ thống tự động đẩy thêm 5 năm kể từ mốc hết hạn.
+- [ ] **Kịch bản 3 - Thanh lý & Ký mới:** Chỉ tạo file Thanh lý ký lại. (Bộ phụ lục giảm giá/kèm theo sẽ sinh riêng). Mức giá mới áp dụng cho trọn thời gian 5 năm của HĐ mới. Tất cả gom lại vào tool hiện tại, người dùng chỉ chọn từ menu đã có (drop-down list/tuỳ chọn có sẵn).
 
 ## 5. ƯỚC TÍNH SƠ BỘ
-- **Độ phức tạp:** Cao (Cần thuật toán xử lý ngày tháng (date-fns hoặc python datetime) phức tạp để xử lý ngày 28/29/30/31).
-- **Phạm vi áp dụng:** Chỉ áp dụng cho loại **Gia hạn** và **Thanh lý ký lại**.
-- **Rủi ro:** Cần đảm bảo logic làm tròn không gây ra số âm ở mục "Mặt bằng".
+- **Độ phức tạp:** Đơn giản (Chủ yếu là gắn mapping logic đúng biến (variables) về thời gian, ngày tháng vào các template Word đã có sẵn backend).
+- **Rủi ro:** Cần handle logic code chuẩn về ngày hết hạn (end_date) giữa HĐ cũ và HĐ mới để tool tính dư nợ không bị nhầm.
 
 ## 6. BƯỚC TIẾP THEO
-→ Chạy `/plan` để thiết kế chi tiết thuật toán tính ngày và cập nhật UI.
-
+→ Chạy `/plan` để lên thiết kế chi tiết logic code.

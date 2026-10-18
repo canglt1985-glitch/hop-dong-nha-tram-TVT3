@@ -1,4 +1,21 @@
 # Changelog
+ 
+## [2026-05-25 - Đồng bộ Biên bản (BBLV) & Hoàn thiện giao diện]
+### Added
+- **Đồng hành BBLV cho toàn bộ tệp mẫu**: API backend hiện đã tự động sinh kèm tệp đồng hành `BBLV_{site_id}.docx` đi kèm khi người dùng xuất bất kỳ loại mẫu hợp đồng/phụ lục nào, thay vì chỉ giới hạn ở mẫu thanh lý.
+- **Sửa hiển thị VHKT và tổng tiền trên UI**: Sửa lỗi giao diện hiển thị thiếu trường VHKT/Bảo vệ và tính tổng bị lệch trên panel ghim Hạng mục giá thuê (yêu cầu) tại giao diện React (`App.tsx`).
+- **Quy chuẩn Người Đại diện & Chức danh Bên A**:
+  - Lê Tân Cảng (Mặc định): *"Tổ trưởng TVT3"*
+  - Lê Thanh Quang: *"chuyên viên TVT3"*
+  - Trần Đăng Phan: *"Chuyên viên TVT3"*
+
+### Changed
+- **Chống cộng lặp VHKT**: Tích hợp điều kiện loại trừ: chỉ tự động cộng dồn 600K guard fee MobiFone trong biên bản nếu trường dữ liệu excel thô của trạm chưa khai báo trường `vhkt` độc lập.
+- **Đơn giản hóa đơn giá BBLV**: Tối giản định dạng giá xuất ra trong biên bản thành chuỗi phẳng (e.g. `3.000.000 đồng/ tháng`) loại bỏ ngoặc giải thích chi tiết theo mong muốn của người dùng.
+
+### Technical
+- Cập nhật định nghĩa TypeScript interface `Site` bổ sung trường `vhkt?: number` trong `prices_breakdown`.
+- Viết kịch bản kiểm định tích hợp tự động toàn diện `verify_vhkts_and_all_templates.py` kiểm tra chuỗi giá trị và đại diện.
 
 ## [2026-05-14 - Phiên chiều]
 ### Added

@@ -1,24 +1,33 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState, useMemo } from 'react'
-import { 
-  FileText, Loader2, Search, 
-  Download, Layers, 
-  ChevronDown, Settings, BarChart2, 
-  AlertTriangle, Filter, Copy, ExternalLink, RefreshCw, Calendar
+import {
+  FileText, Loader2, Search,
+  Download, Layers, FileDown,
+  ChevronDown, Settings, BarChart2,
+  AlertTriangle, Filter, Copy, ExternalLink, RefreshCw, Calendar,
+  FolderOpen, Trash2
 } from 'lucide-react'
 
-import { fetchSettings, updateSettings, fetchSites, updateProgress, generateDocument } from './api/siteApi';
+import { fetchSettings, updateSettings, fetchSites, updateProgress, generateDocument, downloadFileHelper, openFolder, openFileDirectly, cleanOutputFolder } from './api/siteApi';
 import { formatCurrency, isContractExpired, isCompleted, isPriceAddendumPending, isBankAccountMismatch, matchToVt, isOutOfPriceRange, isUnpaid, calculateAlignedCycles } from './utils/siteLogic';
 import type { Site } from './types/site';
+import BulkExportCCT from './components/BulkExportCCT';
+import BulkExportBBLV from './components/BulkExportBBLV';
 
 // --- BIỂU MẪU ĐĂNG KÝ (TEMPLATES REGISTRATION) ---
 const TEMPLATE_CONFIGS = [
   { id: 'phu_luc_giam_gia', name: '1. Phụ lục giảm giá đơn giá', ready: true },
-  { id: 'phu_luc_gia_han', name: '2. Phụ lục gia hạn thời gian', ready: true },
+  { id: 'phu_luc_gia_han', name: '2. Phụ lục gia hạn thời gian (5 năm)', ready: true },
+  { id: 'phu_luc_gia_han_ngan_han', name: '2b. Phụ lục gia hạn ngắn hạn (1-2 năm)', ready: true },
   { id: 'phu_luc_giam_gia_gia_han', name: '3. Phụ lục giảm giá & gia hạn (5 năm)', ready: true },
+  { id: 'phu_luc_giam_gia_gia_han_ngan_han', name: '3b. Phụ lục giảm giá & gia hạn ngắn hạn (1-2 năm)', ready: true },
   { id: 'thanh_ly_ky_lai', name: '4. Phụ lục thanh lý, ký lại (5 năm)', ready: true },
-  { id: 'thanh_ly_ky_moi', name: '5. Phụ lục thanh lý, ký mới (đổi chủ thể)', ready: false },
-  { id: 'ky_moi_hop_dong', name: '6. Ký mới hợp đồng hoàn toàn', ready: false }
+  { id: 'thanh_ly_ky_moi', name: '5. Phụ lục thanh lý, ký mới (đổi chủ thể)', ready: true },
+  { id: 'ky_moi_hop_dong', name: '6. Ký mới hợp đồng hoàn toàn', ready: true },
+  { id: 'phu_luc_cct_a', name: '7. Phụ lục chuyển chủ thể bên A', ready: true },
+  { id: 'phu_luc_cct_a_gia_han', name: '8. Phụ lục chuyển chủ thể bên A & gia hạn', ready: true },
+  { id: 'phu_luc_cct', name: '9. Phụ lục chuyển chủ thể bên B', ready: true },
+  { id: 'phu_luc_cct_gia_han', name: '10. Phụ lục chuyển chủ thể bên B & gia hạn', ready: true }
 ];
 
 // --- TRẠNG THÁI TIẾN ĐỘ HỒ SƠ (PROGRESS STATUS CATEGORIES) ---
@@ -37,27 +46,28 @@ const STATUS_CATEGORIES = [
 function App() {
   const [sites, setSites] = useState<Site[]>([])
   const [loading, setLoading] = useState(true)
-  
+
   // Trạm được chọn hiện hành
   const [selectedSiteId, setSelectedSiteId] = useState<string>('')
-  
+
   // Từ khóa tìm kiếm cho bảng Master Table
   const [tableSearchQuery, setTableSearchQuery] = useState('')
-  
+
   // Lọc tab báo cáo thống kê: 'all' | 'expired' | 'unprocessed' | 'mismatch' | 'success' | 'outOfPrice' | 'unpaid'
   const [activeAuditFilter, setActiveAuditFilter] = useState<string>('all')
-  
+
   // Lọc theo Tổ VT: 'all' | 'VT1' | 'VT2' | 'VT3' | 'VT4' | 'VT5'
   const [selectedToVt, setSelectedToVt] = useState<string>('all')
-  
+
   // Lọc theo Loại Trạm: 'all' | 'HTCS' | 'MBF' | 'VNPT'
   const [activeTypeFilter, setActiveTypeFilter] = useState<string>('all')
-  
+
   const [activeMenu, setActiveMenu] = useState('Bảng điều khiển')
   const [generating, setGenerating] = useState(false)
   const [downloadFilename, setDownloadFilename] = useState<string | null>(null)
+  const [extraFiles, setExtraFiles] = useState<string[]>([])
   const [savingProgress, setSavingProgress] = useState(false)
-  
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 30
@@ -65,9 +75,32 @@ function App() {
   // Các trường chỉnh sửa thông tin thực tế cho trạm đang chọn
   const [editStatus, setEditStatus] = useState('dong_y')
   const [editTemplate, setEditTemplate] = useState('thanh_ly_ky_lai')
+  const [extensionYears, setExtensionYears] = useState<number>(5)
   const [newContractNo, setNewContractNo] = useState('')
   const [newContractDate, setNewContractDate] = useState('')
   const [newPriceConfirmed, setNewPriceConfirmed] = useState<string>('')
+  const [applyVb1245, setApplyVb1245] = useState<boolean>(true)
+  const [bblvRepresentative, setBblvRepresentative] = useState('Lê Thanh Quang')
+  const [bblvScenario, setBblvScenario] = useState('auto')
+
+  // State hỗ trợ Tích chọn & Chỉnh sửa trực tiếp từng Hạng mục thuê CSHT
+  const [customBreakdown, setCustomBreakdown] = useState<{
+    mb: number;
+    pm: number;
+    mfd: number;
+    cot: number;
+    vhkt: number;
+    giam_tru: number;
+  }>({ mb: 0, pm: 0, mfd: 0, cot: 0, vhkt: 0, giam_tru: 0 })
+
+  const [enabledItems, setEnabledItems] = useState<{
+    mb: boolean;
+    pm: boolean;
+    mfd: boolean;
+    cot: boolean;
+    vhkt: boolean;
+    giam_tru: boolean;
+  }>({ mb: true, pm: true, mfd: true, cot: true, vhkt: true, giam_tru: true })
 
   // Cấu hình Google Sheets settings
   const [spreadsheetId, setSpreadsheetId] = useState('19fmCxjIiY0g0bj823-QpThXL8UyYeZKAdBoCyeodv1g')
@@ -82,7 +115,7 @@ function App() {
         if (data.web_app_url) setWebAppUrl(data.web_app_url)
       })
       .catch(err => console.error('Lỗi tải cấu hình settings:', err))
-      
+
     fetchSitesList()
   }, [])
 
@@ -112,13 +145,18 @@ function App() {
   useEffect(() => {
     if (selectedSite) {
       const isSaved = !!selectedSite.progress_tracker?.last_updated
-      
+
       // Auto-suggest Logic (Trước 30/06/2026 -> Hợp đồng mới | Sau -> Phụ lục)
       const isExpiringSoon = isContractExpired(selectedSite)
+      const isMismatch = isBankAccountMismatch(selectedSite)
       const suggestedStatus = isExpiringSoon ? 'can_thanh_ly' : 'dong_y'
       const isMbf = (selectedSite.site_type || '').toUpperCase().includes('MBF')
       const defaultExtTemplate = isMbf ? 'phu_luc_gia_han' : 'thanh_ly_ky_lai'
       let defaultTemplate = isExpiringSoon ? defaultExtTemplate : 'phu_luc_giam_gia'
+
+      if (isMismatch) {
+        defaultTemplate = isExpiringSoon ? 'phu_luc_cct_a_gia_han' : 'phu_luc_cct_a'
+      }
 
       if (isSaved) {
         setEditStatus(selectedSite.progress_tracker?.status || suggestedStatus)
@@ -132,9 +170,9 @@ function App() {
         // Chưa lưu -> Ép trạng thái và biểu mẫu gợi ý
         setEditStatus(suggestedStatus)
       }
-      
+
       setEditTemplate(defaultTemplate)
-      
+
       setNewContractNo(selectedSite.progress_tracker?.new_contract_no || '')
       setNewContractDate(selectedSite.progress_tracker?.new_contract_date || '')
       setNewPriceConfirmed(
@@ -142,45 +180,65 @@ function App() {
           ? String(selectedSite.progress_tracker.new_price_confirmed)
           : String(selectedSite.new_price)
       )
+
+      // Đồng bộ phân rã giá các hạng mục
+      const bd = (selectedSite.prices_breakdown || {}) as any
+      setCustomBreakdown({
+        mb: bd.mb || 0,
+        pm: bd.pm || 0,
+        mfd: bd.mfd || 0,
+        cot: bd.cot || 0,
+        vhkt: bd.vhkt || 0,
+        giam_tru: bd.giam_tru || 0
+      })
+      setEnabledItems({
+        mb: (bd.mb || 0) > 0,
+        pm: (bd.pm || 0) > 0,
+        mfd: (bd.mfd || 0) > 0,
+        cot: (bd.cot || 0) > 0,
+        vhkt: (bd.vhkt || 0) > 0,
+        giam_tru: (bd.giam_tru || 0) !== 0
+      })
     }
-  }, [selectedSite])
-  
+  }, [selectedSite?.site_id])
+
   // Tính toán chu kỳ thanh toán dựa trên logic mới (Cân đối ngày lẻ vào Kỳ 1)
   const alignedPaymentCycles = useMemo(() => {
     if (!selectedSite || !newPriceConfirmed || isNaN(parseFloat(newPriceConfirmed))) return null;
-    
-    // Logic: Ngày bắt đầu HĐ mới = Ngày sau ngày hết hạn cũ
-    let startDateStr = '';
-    try {
-      if (selectedSite.end_date) {
-        let expDate: Date;
-        if (selectedSite.end_date.includes('/')) {
-          const [d, m, y] = selectedSite.end_date.split('/').map(Number);
-          expDate = new Date(y, m - 1, d);
-        } else {
-          // Assume ISO YYYY-MM-DD
-          expDate = new Date(selectedSite.end_date);
-        }
-        
-        if (!isNaN(expDate.getTime())) {
-          expDate.setDate(expDate.getDate() + 1);
-          startDateStr = expDate.toLocaleDateString('en-GB');
+
+    // Ưu tiên ngày tùy chọn/ngày HĐ mới được nhập, nếu không lấy Ngày hết hạn cũ + 1
+    let startDateStr = newContractDate ? newContractDate.trim() : '';
+    if (!startDateStr) {
+      try {
+        if (selectedSite.end_date) {
+          let expDate: Date;
+          if (selectedSite.end_date.includes('/')) {
+            const [d, m, y] = selectedSite.end_date.split('/').map(Number);
+            expDate = new Date(y, m - 1, d);
+          } else {
+            expDate = new Date(selectedSite.end_date);
+          }
+
+          if (!isNaN(expDate.getTime())) {
+            expDate.setDate(expDate.getDate() + 1);
+            startDateStr = expDate.toLocaleDateString('en-GB');
+          } else {
+            startDateStr = '01/01/2026';
+          }
         } else {
           startDateStr = '01/01/2026';
         }
-      } else {
+      } catch {
         startDateStr = '01/01/2026';
       }
-    } catch {
-      startDateStr = '01/01/2026';
     }
 
-    const cycleMonths = 6; 
-    const termYears = 5;   
+    const cycleMonths = 6;
+    const termYears = extensionYears || 5;
     const monthlyPrice = parseFloat(newPriceConfirmed);
-    
+
     return calculateAlignedCycles(startDateStr, cycleMonths, termYears, monthlyPrice);
-  }, [selectedSite, newPriceConfirmed]);
+  }, [selectedSite, newPriceConfirmed, newContractDate, extensionYears]);
 
 
   // Thống kê số lượng (Có thể áp dụng filter Tổ VT động để nhìn số liệu cực kỳ trực quan)
@@ -265,11 +323,11 @@ function App() {
       if (activeTypeFilter !== 'all') {
         const siteType = (s.site_type || '').toUpperCase()
         const filterType = activeTypeFilter.toUpperCase()
-        
+
         // Smart match: MBF matches MOBIFONE
         const isMbfMatch = (filterType === 'MBF' && (siteType.includes('MBF') || siteType.includes('MOBIFONE')))
         const isOtherMatch = siteType.includes(filterType)
-        
+
         if (!(isMbfMatch || isOtherMatch)) return false
       }
 
@@ -303,7 +361,7 @@ function App() {
   // Thống kê chi tiết theo Tổ Viễn Thông (Tổ VT)
   const vtStats = useMemo(() => {
     const groups: { [key: string]: { total: number; expired: number; unaddended: number; mismatch: number; success: number } } = {}
-    
+
     sites.forEach(s => {
       const vt = s.to_vt || 'Chưa rõ'
       if (!groups[vt]) {
@@ -315,7 +373,7 @@ function App() {
       if (isBankAccountMismatch(s)) groups[vt].mismatch++
       if (isCompleted(s)) groups[vt].success++
     })
-    
+
     return Object.entries(groups).map(([name, val]) => ({
       name,
       ...val,
@@ -329,6 +387,7 @@ function App() {
     setSavingProgress(true)
 
     const updatedProgress = { ...selectedSite.progress_tracker.progress }
+    const confirmedPrice = newPriceConfirmed ? parseFloat(newPriceConfirmed) : undefined;
     const payload = {
       site_id: selectedSite.site_id,
       selected_template: editTemplate,
@@ -336,47 +395,51 @@ function App() {
       progress: updatedProgress,
       new_contract_no: newContractNo,
       new_contract_date: newContractDate,
-      new_price_confirmed: newPriceConfirmed ? parseFloat(newPriceConfirmed) : undefined
+      new_price_confirmed: confirmedPrice,
+      prices_breakdown: customBreakdown
     }
 
     updateProgress(payload)
-    .then(data => {
-      setSavingProgress(false)
-      if (data.success) {
-        setSites(prev => prev.map(s => {
-          if (s.site_id === selectedSite.site_id) {
-            return {
-              ...s,
-              progress_tracker: {
-                selected_template: editTemplate,
-                status: editStatus,
-                new_contract_no: newContractNo,
-                new_contract_date: newContractDate,
-                new_price_confirmed: newPriceConfirmed ? parseFloat(newPriceConfirmed) : undefined,
-                progress: updatedProgress
+      .then(data => {
+        setSavingProgress(false)
+        if (data.success) {
+          setSites(prev => prev.map(s => {
+            if (s.site_id === selectedSite.site_id) {
+              return {
+                ...s,
+                new_price: confirmedPrice !== undefined ? confirmedPrice : s.new_price,
+                prices_breakdown: { ...customBreakdown, cot_rounded: customBreakdown.cot },
+                progress_tracker: {
+                  selected_template: editTemplate,
+                  status: editStatus,
+                  new_contract_no: newContractNo,
+                  new_contract_date: newContractDate,
+                  new_price_confirmed: confirmedPrice,
+                  prices_breakdown: { ...customBreakdown, cot_rounded: customBreakdown.cot },
+                  progress: updatedProgress
+                }
               }
             }
-          }
-          return s
-        }))
-        alert('Đã cập nhật tiến độ & thông tin đàm phán thành công!')
-      }
-    })
-    .catch(err => {
-      setSavingProgress(false)
-      console.error('Lỗi đồng bộ tiến độ:', err)
-      alert('Không thể lưu tiến độ lên máy chủ!')
-    })
+            return s
+          }))
+          alert('Đã cập nhật tiến độ & thông tin đàm phán thành công!')
+        }
+      })
+      .catch(err => {
+        setSavingProgress(false)
+        console.error('Lỗi đồng bộ tiến độ:', err)
+        alert('Không thể lưu tiến độ lên máy chủ!')
+      })
   }
 
   // Tích chọn nhanh các bước trình ký và đồng bộ hóa thông minh trạng thái tiến độ thực tế
   const toggleStep = (stepKey: 'draft_prepared' | 'submitted_internal' | 'signed_and_stamped' | 'archived_doc') => {
     if (!selectedSite) return
-    const updatedProgress = { 
+    const updatedProgress = {
       ...selectedSite.progress_tracker.progress,
       [stepKey]: !selectedSite.progress_tracker.progress[stepKey]
     }
-    
+
     // Tự động xác định trạng thái tổng dựa trên nấc tiến trình cao nhất được tích chọn
     let autoStatus = editStatus
     if (updatedProgress.archived_doc) {
@@ -391,57 +454,57 @@ function App() {
       // Nếu không tích chọn bước nào, quay về mặc định
       autoStatus = isContractExpired(selectedSite) ? 'can_thanh_ly' : 'dong_y'
     }
-    
+
     setEditStatus(autoStatus)
-    
+
     updateProgress({
-        site_id: selectedSite.site_id,
-        selected_template: editTemplate,
-        status: autoStatus,
-        progress: updatedProgress,
-        new_contract_no: newContractNo,
-        new_contract_date: newContractDate,
-        new_price_confirmed: newPriceConfirmed ? parseFloat(newPriceConfirmed) : undefined
+      site_id: selectedSite.site_id,
+      selected_template: editTemplate,
+      status: autoStatus,
+      progress: updatedProgress,
+      new_contract_no: newContractNo,
+      new_contract_date: newContractDate,
+      new_price_confirmed: newPriceConfirmed ? parseFloat(newPriceConfirmed) : undefined
     })
-    .then(data => {
-      if (data.success) {
-        setSites(prev => prev.map(s => {
-          if (s.site_id === selectedSite.site_id) {
-            return {
-              ...s,
-              progress_tracker: {
-                ...s.progress_tracker,
-                status: autoStatus,
-                progress: updatedProgress
+      .then(data => {
+        if (data.success) {
+          setSites(prev => prev.map(s => {
+            if (s.site_id === selectedSite.site_id) {
+              return {
+                ...s,
+                progress_tracker: {
+                  ...s.progress_tracker,
+                  status: autoStatus,
+                  progress: updatedProgress
+                }
               }
             }
-          }
-          return s
-        }))
-      }
-    })
-    .catch(err => console.error('Lỗi tích bước tiến trình:', err))
+            return s
+          }))
+        }
+      })
+      .catch(err => console.error('Lỗi tích bước tiến trình:', err))
   }
 
   // Lưu cấu hình Google Sheets cài đặt hệ thống
   const handleSaveSettings = () => {
     setSavingSettings(true)
     updateSettings({
-        spreadsheet_id: spreadsheetId,
-        web_app_url: webAppUrl
+      spreadsheet_id: spreadsheetId,
+      web_app_url: webAppUrl
+    })
+      .then(data => {
+        setSavingSettings(false)
+        if (data.success) {
+          alert('Đã cấu hình thông tin Google Sheets thành công!')
+          fetchSitesList()
+        }
       })
-    .then(data => {
-      setSavingSettings(false)
-      if (data.success) {
-        alert('Đã cấu hình thông tin Google Sheets thành công!')
-        fetchSitesList()
-      }
-    })
-    .catch(err => {
-      setSavingSettings(false)
-      console.error(err)
-      alert('Lỗi lưu cài đặt hệ thống!')
-    })
+      .catch(err => {
+        setSavingSettings(false)
+        console.error(err)
+        alert('Lỗi lưu cài đặt hệ thống!')
+      })
   }
 
   // Sinh tệp Word (.docx) điền dữ liệu tự động
@@ -449,33 +512,64 @@ function App() {
     if (!selectedSite) return
     setGenerating(true)
     setDownloadFilename(null)
+    setExtraFiles([])
 
-    generateDocument(selectedSite.site_id, editTemplate)
-    .then(data => {
-      if (data.success) {
-        setDownloadFilename(data.filename)
-        setSites(prev => prev.map(s => {
-          if (s.site_id === selectedSite.site_id) {
-            return {
-              ...s,
-              progress_tracker: {
-                ...data.progress,
-                new_contract_no: newContractNo,
-                new_contract_date: newContractDate,
-                new_price_confirmed: newPriceConfirmed ? parseFloat(newPriceConfirmed) : undefined
+    // Tạo breakdown thực tế từ các hạng mục được tích chọn
+    const activePricesBreakdown = {
+      mb: enabledItems.mb ? customBreakdown.mb : 0,
+      pm: enabledItems.pm ? customBreakdown.pm : 0,
+      mfd: enabledItems.mfd ? customBreakdown.mfd : 0,
+      cot: enabledItems.cot ? customBreakdown.cot : 0,
+      vhkt: enabledItems.vhkt ? customBreakdown.vhkt : 0,
+      giam_tru: enabledItems.giam_tru ? (customBreakdown.giam_tru || 0) : 0
+    }
+
+    generateDocument(
+      selectedSite.site_id,
+      editTemplate,
+      applyVb1245,
+      bblvRepresentative,
+      bblvScenario,
+      extensionYears,
+      newContractDate,
+      activePricesBreakdown,
+      newPriceConfirmed ? parseFloat(newPriceConfirmed) : undefined
+    )
+      .then(data => {
+        if (data.success) {
+          setDownloadFilename(data.filename)
+          setExtraFiles(data.extra_files || [])
+
+          // Tự động mở hộp thoại Save As hỏi lưu vào thư mục tải về gần nhất
+          downloadFileHelper(data.filename, true);
+
+          setSites(prev => prev.map(s => {
+            if (s.site_id === selectedSite.site_id) {
+              const confirmedPrice = newPriceConfirmed ? parseFloat(newPriceConfirmed) : undefined;
+              return {
+                ...s,
+                new_price: confirmedPrice !== undefined ? confirmedPrice : s.new_price,
+                prices_breakdown: { ...activePricesBreakdown, cot_rounded: activePricesBreakdown.cot },
+                progress_tracker: {
+                  ...data.progress,
+                  new_contract_no: newContractNo,
+                  new_contract_date: newContractDate,
+                  new_price_confirmed: confirmedPrice
+                }
               }
             }
-          }
-          return s
-        }))
-      }
-      setGenerating(false)
-    })
-    .catch(err => {
-      alert(err.message || 'Lỗi phát sinh trong quá trình soạn file Word!')
-      setGenerating(false)
-    })
+            return s
+          }))
+        }
+        setGenerating(false)
+      })
+      .catch(err => {
+        alert(err.message || 'Lỗi phát sinh trong quá trình soạn file Word!')
+        setGenerating(false)
+      })
   }
+
+
 
   // Mã nguồn Apps Script để copy-paste
   const appsScriptCode = `// Google Apps Script dán vào Extensions -> Apps Script của bạn
@@ -554,7 +648,7 @@ function doPost(e) {
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] text-[#1E293B] font-sans overflow-hidden">
-      
+
       {/* 1. SIDEBAR TRÁI */}
       <aside className="w-[270px] bg-white border-r border-[#E2E8F0] flex flex-col justify-between h-full select-none shrink-0 shadow-sm">
         <div className="flex flex-col">
@@ -573,6 +667,8 @@ function doPost(e) {
               { name: 'Bảng điều khiển', icon: Layers },
               { name: 'Báo cáo thống kê', icon: BarChart2 },
               { name: 'Cài đặt hệ thống', icon: Settings },
+              { name: 'Xuất chuyển chủ thể', icon: FileDown },
+              { name: 'Xuất BBLV hàng loạt', icon: FileDown },
             ].map(item => {
               const Icon = item.icon
               const isActive = activeMenu === item.name
@@ -610,7 +706,7 @@ function doPost(e) {
 
       {/* 2. MAIN WORKSPACE */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        
+
         {/* TOP BAR */}
         <header className="h-[64px] bg-white border-b border-[#E2E8F0] flex items-center justify-between px-8 shrink-0">
           <div className="flex items-center gap-2">
@@ -619,8 +715,34 @@ function doPost(e) {
           </div>
 
           <div className="flex items-center gap-5">
-            <button 
-              onClick={() => fetchSitesList(true)} 
+            <button
+              onClick={() => openFolder().catch(err => alert(err.message))}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-[10px] font-black uppercase text-amber-800 rounded-lg transition-colors cursor-pointer border border-amber-200 shadow-sm"
+              title="Mở thư mục output chứa các file Word đã xuất trên máy tính"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-amber-600" />
+              Mở Thư Mục File
+            </button>
+            <button
+              onClick={async () => {
+                if (confirm('Dọn dẹp bớt file cũ trong thư mục output (chỉ giữ 5 file gần nhất)?')) {
+                  try {
+                    const res = await cleanOutputFolder();
+                    alert(res.message || 'Đã dọn dẹp thư mục output!');
+                  } catch (err: any) {
+                    alert(err.message || 'Lỗi khi dọn dẹp!');
+                  }
+                }
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-rose-50 text-[10px] font-black uppercase text-slate-500 hover:text-rose-600 rounded-lg transition-colors cursor-pointer border border-slate-200"
+              title="Dọn bớt các tệp cũ trong thư mục output, chỉ giữ lại 5 tệp mới nhất"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-slate-400 hover:text-rose-500" />
+              Dọn Output
+            </button>
+            <div className="w-px h-6 bg-slate-200" />
+            <button
+              onClick={() => fetchSitesList(true)}
               title="Đồng bộ lại từ Google Sheets / Excel (Bỏ qua Cache)"
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-[10px] font-black uppercase text-slate-700 rounded-lg transition-colors cursor-pointer border border-slate-200"
             >
@@ -644,13 +766,15 @@ function doPost(e) {
           </div>
         ) : (
           <div className="flex-1 flex overflow-hidden">
-            
+            {activeMenu === 'Xuất chuyển chủ thể' && <BulkExportCCT />}
+            {activeMenu === 'Xuất BBLV hàng loạt' && <BulkExportBBLV />}
+
             {/* VIEW 1: BẢNG ĐIỀU KHIỂN CHÍNH */}
             {activeMenu === 'Bảng điều khiển' && (
               <>
                 {/* PHẦN TRÁI (65%): BÁO CÁO THỐNG KÊ CHẤT LƯỢNG & BẢNG MASTER TABLE */}
                 <div className="w-2/3 h-full overflow-y-auto p-6 space-y-5 border-r border-[#E2E8F0]">
-                  
+
                   {/* Đã xóa các bộ lọc bự ở đây để nhường chỗ cho Table Header Filters */}
 
                   {/* KHU VỰC DANH SÁCH MASTER AUDIT TABLE (BảngMaster đối soát) */}
@@ -667,7 +791,7 @@ function doPost(e) {
                       {/* Thanh tìm kiếm nhanh trong bảng */}
                       <div className="relative w-72">
                         <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
-                        <input 
+                        <input
                           type="text"
                           placeholder="Tìm kiếm mã, chủ trạm, tài khoản, tổ..."
                           value={tableSearchQuery}
@@ -683,7 +807,7 @@ function doPost(e) {
                       <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg p-1 shadow-sm">
                         <span className="text-[10px] font-bold text-slate-500 pl-2">Tổ:</span>
                         {['all', 'VT1', 'VT2', 'VT3', 'VT4', 'VT5'].map(vt => (
-                          <button 
+                          <button
                             key={vt}
                             onClick={() => setSelectedToVt(vt)}
                             className={`px-2 py-1 text-[10px] font-black rounded transition-all ${selectedToVt === vt ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-slate-200'}`}
@@ -697,7 +821,7 @@ function doPost(e) {
                       <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg p-1 shadow-sm">
                         <span className="text-[10px] font-bold text-slate-500 pl-2">Loại:</span>
                         {['all', 'HTCS', 'MBF', 'VNPT'].map(type => (
-                          <button 
+                          <button
                             key={type}
                             onClick={() => setActiveTypeFilter(type)}
                             className={`px-2 py-1 text-[10px] font-black rounded transition-all ${activeTypeFilter === type ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-slate-200'}`}
@@ -710,7 +834,7 @@ function doPost(e) {
                       {/* Tình trạng Filter */}
                       <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg p-1 shadow-sm">
                         <span className="text-[10px] font-bold text-blue-800 pl-2">Tình trạng:</span>
-                        <select 
+                        <select
                           value={activeAuditFilter}
                           onChange={e => setActiveAuditFilter(e.target.value)}
                           className="bg-transparent text-[10px] font-black text-blue-900 outline-none cursor-pointer pr-2 py-1"
@@ -777,10 +901,10 @@ function doPost(e) {
                                       )}
                                     </div>
                                   </td>
-                                  
+
                                   {/* 2. Tổ */}
                                   <td className="p-3 text-slate-500 text-[10px] font-bold">{s.to_vt || 'Chưa rõ'}</td>
-                                  
+
                                   {/* 3. Chủ Nhà */}
                                   <td className="p-3 max-w-[120px]">
                                     <div className="text-slate-800 font-extrabold text-[11px] truncate" title={s.owner}>{s.owner}</div>
@@ -817,7 +941,7 @@ function doPost(e) {
                                     <span className={`text-[9px] px-2 py-0.5 rounded-full border font-black ${completed ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' : currentStatusCat?.color}`}>
                                       {completed ? '✅ Đã hoàn thành' : currentStatusCat?.name}
                                     </span>
-                                    
+
                                     {unmatchedBank && (
                                       <span className="text-[8.5px] bg-rose-50 text-rose-600 border border-rose-100 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
                                         <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" /> Lệch TK
@@ -830,7 +954,7 @@ function doPost(e) {
                           )}
                         </tbody>
                       </table>
-                      
+
                       {/* PAGINATION CONTROLS */}
                       {totalPages > 1 && (
                         <div className="flex justify-between items-center px-4 py-3 bg-slate-50 border-t border-slate-200 text-xs font-medium">
@@ -863,328 +987,776 @@ function doPost(e) {
                 </div>
 
                 {/* PHẦN PHẢI (35%): THAO TÁC CẬP NHẬT THÔNG TIN VÀ XUẤT SOẠN BIỂU MẪU */}
-                <div className="w-1/3 h-full overflow-y-auto p-6 bg-white space-y-4 flex flex-col justify-between">
-                  
-                  {selectedSite ? (
-                    <div className="space-y-4 flex-1 flex flex-col justify-between">
-                      
-                      {/* Tên Trạm & Bên Cho Thuê */}
-                      <div className="space-y-3 pb-3 border-b border-slate-100">
-                        <div>
-                          <span className="text-[10px] text-indigo-600 font-black uppercase tracking-widest block">Tổ Viễn Thông: {selectedSite.to_vt || 'Chưa rõ'}</span>
-                          <h2 className="text-base font-black text-slate-800 mt-1 flex items-center gap-1.5">
-                            <span className="text-blue-600">{selectedSite.site_id}</span> - {selectedSite.owner}
-                          </h2>
-                        </div>
-                        
-                        {/* 1. THÔNG TIN CHỦ TRẠM & THỜI GIAN THUÊ & CHU KỲ */}
-                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 text-[11px] font-bold text-slate-600 space-y-1.5 text-left">
-                          <div>
-                            👤 <span className="text-slate-400 font-semibold">Chủ trạm:</span> <span className="text-slate-800">{selectedSite.owner}</span>
-                          </div>
-                          <div>
-                            📅 <span className="text-slate-400 font-semibold">Thời gian thuê gốc:</span> <span className="text-slate-800">{selectedSite.end_date || 'Chưa rõ'}</span>
-                          </div>
-                          <div>
-                            ⏳ <span className="text-slate-400 font-semibold">Chu kỳ thanh toán:</span> <span className="text-slate-800">{selectedSite.payment_cycle || '6 tháng'}</span>
-                          </div>
-                        </div>
+                <div className="w-1/3 h-full bg-white flex flex-col overflow-hidden border-l border-slate-200/80">
 
-                        {/* 2. THÔNG TIN GIÁ THUÊ (SO SÁNH KHUNG VÀ THỰC TẾ) */}
-                        <div className="flex flex-col gap-2">
-                          {/* KHUNG GIÁ YÊU CẦU */}
+                  {selectedSite ? (
+                    <div className="flex-1 flex flex-col h-full overflow-hidden">
+                      <div className="flex-1 overflow-y-auto p-5 space-y-3">
+
+                        {/* Tên Trạm & Bên Cho Thuê */}
+                        <div className="space-y-3 pb-3 border-b border-slate-100">
+                          <div>
+                            <span className="text-[10px] text-indigo-600 font-black uppercase tracking-widest block">Tổ Viễn Thông: {selectedSite.to_vt || 'Chưa rõ'}</span>
+                            <h2 className="text-base font-black text-slate-800 mt-1 flex items-center gap-1.5">
+                              <span className="text-blue-600">{selectedSite.site_id}</span> - {selectedSite.owner}
+                            </h2>
+                          </div>
+
+                          {/* 1. THÔNG TIN CHỦ TRẠM & THỜI GIAN THUÊ & CHU KỲ */}
                           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 text-[11px] font-bold text-slate-600 space-y-1.5 text-left">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">🏦 HẠNG MỤC GIÁ THUÊ (YÊU CẦU):</span>
-                            <div className="grid grid-cols-2 gap-y-1 gap-x-2 text-[10.5px]">
-                              {selectedSite.prices_breakdown.mb > 0 && (
-                                <div>🏢 <span className="text-slate-400 font-semibold">Mặt bằng:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.mb)}</span></div>
-                              )}
-                              {selectedSite.prices_breakdown.pm > 0 && (
-                                <div>📦 <span className="text-slate-400 font-semibold">Phòng máy:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.pm)}</span></div>
-                              )}
-                              {selectedSite.prices_breakdown.mfd > 0 && (
-                                <div>⚡ <span className="text-slate-400 font-semibold">MPĐ:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.mfd)}</span></div>
-                              )}
-                              {selectedSite.prices_breakdown.cot > 0 && (
-                                <div>🗼 <span className="text-slate-400 font-semibold">Cột anten:</span> <span className="text-slate-800 font-black">{formatCurrency(selectedSite.prices_breakdown.cot)}</span></div>
-                              )}
-                              {selectedSite.prices_breakdown.giam_tru !== 0 && (
-                                <div className="col-span-2 text-rose-600">📉 <span className="text-slate-400 font-semibold">Giảm trừ:</span> <span className="font-black">{formatCurrency(selectedSite.prices_breakdown.giam_tru)}</span></div>
-                              )}
+                            <div>
+                              👤 <span className="text-slate-400 font-semibold">Chủ trạm:</span> <span className="text-slate-800">{selectedSite.owner}</span>
+                            </div>
+                            <div>
+                              📅 <span className="text-slate-400 font-semibold">Thời gian thuê gốc:</span> <span className="text-slate-800">{selectedSite.end_date || 'Chưa rõ'}</span>
+                            </div>
+                            <div>
+                              ⏳ <span className="text-slate-400 font-semibold">Chu kỳ thanh toán:</span> <span className="text-slate-800">{selectedSite.payment_cycle || '6 tháng'}</span>
                             </div>
                           </div>
 
-                          {/* GIÁ ĐÃ THOẢ THUẬN */}
-                          <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100 text-[11px] font-bold text-slate-600 space-y-1.5 text-left">
-                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">🤝 KẾT QUẢ ĐÀM PHÁN:</span>
-                            <div className="flex justify-between items-center text-xs">
+                          {/* 2. KẾT QUẢ ĐÀM PHÁN & Ô NHẬP GIÁ CHỐT TRỰC TIẾP */}
+                          <div className="bg-emerald-50/60 p-3.5 rounded-2xl border-2 border-emerald-300 text-[11px] font-bold text-slate-600 space-y-2.5 text-left shadow-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                                🤝 KẾT QUẢ & ĐƠN GIÁ ĐÀM PHÁN:
+                              </span>
+                              {selectedSite.old_price > 0 && parseFloat(newPriceConfirmed) > 0 && selectedSite.old_price > parseFloat(newPriceConfirmed) && (
+                                <span className="text-[9.5px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
+                                  Giảm {formatCurrency(selectedSite.old_price - parseFloat(newPriceConfirmed))}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Đơn giá gốc */}
+                            <div className="flex justify-between items-center text-xs pb-1.5 border-b border-emerald-200/60">
                               <span className="text-slate-500 font-extrabold">Đơn giá gốc:</span>
                               <span className="text-slate-800 font-black">{formatCurrency(selectedSite.old_price)}</span>
                             </div>
-                            <div className="flex justify-between items-center text-xs mt-1">
-                              <span className="text-emerald-600 font-extrabold">Giá sau đàm phán:</span>
-                              <span className="text-emerald-600 font-black">{formatCurrency(selectedSite.new_price)}</span>
+
+                            {/* Ô NHẬP GIÁ ĐÀM PHÁN TRỰC TIẾP */}
+                            <div className="space-y-1.5 pt-0.5">
+                              <div className="flex justify-between items-center">
+                                <label className="text-[10px] font-black text-emerald-950 uppercase tracking-wide flex items-center gap-1">
+                                  💰 Đơn giá đàm phán chốt mới:
+                                </label>
+                                {newPriceConfirmed && !isNaN(parseFloat(newPriceConfirmed)) && parseFloat(newPriceConfirmed) > 0 && (
+                                  <span className="text-[11px] font-black text-emerald-700 bg-white px-2 py-0.5 rounded-md border border-emerald-300 shadow-xs">
+                                    {formatCurrency(parseFloat(newPriceConfirmed))}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={newPriceConfirmed}
+                                  onChange={e => {
+                                    const raw = e.target.value.replace(/[^\d]/g, '');
+                                    setNewPriceConfirmed(raw);
+                                  }}
+                                  placeholder="Nhập giá đàm phán mới (VND)..."
+                                  className="w-full bg-white text-sm font-black text-emerald-800 pl-3 pr-14 py-2 rounded-xl border-2 border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-600 shadow-inner tracking-wide"
+                                />
+                                <span className="absolute right-3 top-2.5 text-xs font-black text-slate-400 pointer-events-none">
+                                  VNĐ
+                                </span>
+                              </div>
+
+                              {/* CÁC NÚT TÁC VỤ NHANH */}
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                <span className="text-[8.5px] font-extrabold text-slate-400 uppercase">Gợi ý:</span>
+                                {selectedSite.new_price > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewPriceConfirmed(String(selectedSite.new_price))}
+                                    className="px-2 py-0.5 text-[9px] font-black rounded-md bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                    title="Lấy giá đàm phán ghi nhận từ bảng dữ liệu"
+                                  >
+                                    Giá mục tiêu ({formatCurrency(selectedSite.new_price)})
+                                  </button>
+                                )}
+                                {selectedSite.old_price > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewPriceConfirmed(String(selectedSite.old_price))}
+                                    className="px-2 py-0.5 text-[9px] font-black rounded-md bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                                    title="Giữ nguyên giá gốc không giảm"
+                                  >
+                                    Giá gốc ({formatCurrency(selectedSite.old_price)})
+                                  </button>
+                                )}
+                                {parseFloat(newPriceConfirmed) > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const p = parseFloat(newPriceConfirmed);
+                                      const rounded = Math.floor(p / 50000) * 50000;
+                                      setNewPriceConfirmed(String(rounded));
+                                    }}
+                                    className="px-2 py-0.5 text-[9px] font-black rounded-md bg-emerald-700 text-white hover:bg-emerald-800 transition-colors cursor-pointer"
+                                    title="Làm tròn xuống bội số 50.000đ"
+                                  >
+                                    Làm tròn 50k
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={saveChangesToServer}
+                                  disabled={savingProgress}
+                                  className="ml-auto px-2.5 py-0.5 text-[9px] font-black rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer shadow-xs"
+                                  title="Lưu ngay giá này vào hệ thống"
+                                >
+                                  {savingProgress ? 'Đang lưu...' : '💾 Lưu giá'}
+                                </button>
+                              </div>
                             </div>
-                            
+
                             {(selectedSite.no_addendum_needed || (selectedSite.old_price > 0 && selectedSite.new_price > 0 && selectedSite.old_price <= selectedSite.new_price)) && (
-                              <div className="mt-2.5 p-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-[9.5px] font-black leading-relaxed flex items-start gap-1.5 animate-pulse">
+                              <div className="mt-2 p-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-[9.5px] font-black leading-relaxed flex items-start gap-1.5">
                                 <span className="text-indigo-500">ℹ️</span>
                                 <span>Trạm không cần làm phụ lục giảm giá (Giá hiện tại HT &lt;= Giá mục tiêu MT).</span>
                               </div>
                             )}
 
                             {(selectedSite.reached_target && (selectedSite.reached_target.toLowerCase().includes('không') || selectedSite.reached_target.toLowerCase().includes('chưa'))) && (
-                              <div className="mt-2.5 p-2 bg-rose-50 border border-rose-100 text-rose-700 rounded-lg text-[9.5px] font-black leading-relaxed flex items-start gap-1.5">
+                              <div className="mt-2 p-2 bg-rose-50 border border-rose-100 text-rose-700 rounded-lg text-[9.5px] font-black leading-relaxed flex items-start gap-1.5">
                                 <span className="text-rose-500">⚠️</span>
                                 <span>Trạm đàm phán CHƯA ĐẠT MỤC TIÊU. Không đủ điều kiện xuất phụ lục giảm giá.</span>
                               </div>
                             )}
                           </div>
-                        </div>
 
+                          {/* 2b. HẠNG MỤC GIÁ THUÊ (GẬP MỞ TÙY CHỌN KHI CẦN ĐIỀU CHỈNH) */}
+                          <details className="group border border-slate-200/80 rounded-xl bg-slate-50/50 p-2.5 transition-all text-left">
+                            <summary className="text-[10px] font-black text-slate-600 uppercase tracking-wider flex items-center justify-between cursor-pointer select-none">
+                              <span className="flex items-center gap-1.5">
+                                🏦 Chi tiết hạng mục giá (MB, Cột, PM...)
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] text-blue-600 font-extrabold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                                  Bật/tắt
+                                </span>
+                                <span className="text-slate-400 group-open:rotate-180 transition-transform text-xs">▼</span>
+                              </div>
+                            </summary>
 
-                        
-                        {/* 3b. CHU KỲ THANH TOÁN DỰ KIẾN (HIỂN THỊ RÕ NÉT) */}
-                        {alignedPaymentCycles && (
-                          <div className="bg-white p-4 rounded-2xl border-2 border-blue-100 shadow-xl space-y-4">
-                            <div className="flex justify-between items-center pb-2 border-b border-blue-50">
-                              <span className="text-[11px] font-black text-blue-800 uppercase tracking-widest flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-blue-600" />
-                                Chu kỳ thanh toán dự kiến
-                              </span>
-                              <span className="text-[10px] font-black text-white bg-blue-600 px-3 py-1 rounded-full shadow-sm">
-                                End: {alignedPaymentCycles.endDate}
-                              </span>
+                            <div className="mt-2 space-y-1.5 text-[10.5px] pt-1">
+                              {/* Mặt bằng */}
+                              <div className="flex items-center justify-between bg-white p-1.5 rounded-lg border border-slate-200/80">
+                                <label className="flex items-center gap-1.5 cursor-pointer font-extrabold text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={enabledItems.mb}
+                                    onChange={e => {
+                                      const checked = e.target.checked
+                                      setEnabledItems(prev => ({ ...prev, mb: checked }))
+                                      if (checked && customBreakdown.mb === 0) {
+                                        setCustomBreakdown(prev => ({ ...prev, mb: selectedSite?.prices_breakdown?.mb || 3000000 }))
+                                      }
+                                    }}
+                                    className="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span>🏢 Mặt bằng (MB)</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  disabled={!enabledItems.mb}
+                                  value={enabledItems.mb ? customBreakdown.mb : 0}
+                                  onChange={e => setCustomBreakdown(prev => ({ ...prev, mb: parseFloat(e.target.value) || 0 }))}
+                                  className={`w-28 text-right font-black text-xs px-2 py-1 rounded border ${enabledItems.mb ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                />
+                              </div>
+
+                              {/* Phòng máy */}
+                              <div className="flex items-center justify-between bg-white p-1.5 rounded-lg border border-slate-200/80">
+                                <label className="flex items-center gap-1.5 cursor-pointer font-extrabold text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={enabledItems.pm}
+                                    onChange={e => {
+                                      const checked = e.target.checked
+                                      setEnabledItems(prev => ({ ...prev, pm: checked }))
+                                      if (checked && customBreakdown.pm === 0) {
+                                        setCustomBreakdown(prev => ({ ...prev, pm: selectedSite?.prices_breakdown?.pm || 1000000 }))
+                                      }
+                                    }}
+                                    className="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span>📦 Phòng máy (PM)</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  disabled={!enabledItems.pm}
+                                  value={enabledItems.pm ? customBreakdown.pm : 0}
+                                  onChange={e => setCustomBreakdown(prev => ({ ...prev, pm: parseFloat(e.target.value) || 0 }))}
+                                  className={`w-28 text-right font-black text-xs px-2 py-1 rounded border ${enabledItems.pm ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                />
+                              </div>
+
+                              {/* MPĐ */}
+                              <div className="flex items-center justify-between bg-white p-1.5 rounded-lg border border-slate-200/80">
+                                <label className="flex items-center gap-1.5 cursor-pointer font-extrabold text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={enabledItems.mfd}
+                                    onChange={e => {
+                                      const checked = e.target.checked
+                                      setEnabledItems(prev => ({ ...prev, mfd: checked }))
+                                      if (checked && customBreakdown.mfd === 0) {
+                                        setCustomBreakdown(prev => ({ ...prev, mfd: selectedSite?.prices_breakdown?.mfd || 500000 }))
+                                      }
+                                    }}
+                                    className="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span>⚡ Máy phát điện (MFĐ)</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  disabled={!enabledItems.mfd}
+                                  value={enabledItems.mfd ? customBreakdown.mfd : 0}
+                                  onChange={e => setCustomBreakdown(prev => ({ ...prev, mfd: parseFloat(e.target.value) || 0 }))}
+                                  className={`w-28 text-right font-black text-xs px-2 py-1 rounded border ${enabledItems.mfd ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                />
+                              </div>
+
+                              {/* Cột anten */}
+                              <div className="flex items-center justify-between bg-white p-1.5 rounded-lg border border-slate-200/80">
+                                <label className="flex items-center gap-1.5 cursor-pointer font-extrabold text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={enabledItems.cot}
+                                    onChange={e => {
+                                      const checked = e.target.checked
+                                      setEnabledItems(prev => ({ ...prev, cot: checked }))
+                                      if (checked && customBreakdown.cot === 0) {
+                                        setCustomBreakdown(prev => ({ ...prev, cot: selectedSite?.prices_breakdown?.cot || 2000000 }))
+                                      }
+                                    }}
+                                    className="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span>🗼 Cột anten (Cột)</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  disabled={!enabledItems.cot}
+                                  value={enabledItems.cot ? customBreakdown.cot : 0}
+                                  onChange={e => setCustomBreakdown(prev => ({ ...prev, cot: parseFloat(e.target.value) || 0 }))}
+                                  className={`w-28 text-right font-black text-xs px-2 py-1 rounded border ${enabledItems.cot ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                />
+                              </div>
+
+                              {/* VHKT/Bảo vệ */}
+                              <div className="flex items-center justify-between bg-white p-1.5 rounded-lg border border-slate-200/80">
+                                <label className="flex items-center gap-1.5 cursor-pointer font-extrabold text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={enabledItems.vhkt}
+                                    onChange={e => {
+                                      const checked = e.target.checked
+                                      setEnabledItems(prev => ({ ...prev, vhkt: checked }))
+                                      if (checked && customBreakdown.vhkt === 0) {
+                                        setCustomBreakdown(prev => ({ ...prev, vhkt: selectedSite?.prices_breakdown?.vhkt || 500000 }))
+                                      }
+                                    }}
+                                    className="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span>🛡️ VHKT / Bảo vệ</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  disabled={!enabledItems.vhkt}
+                                  value={enabledItems.vhkt ? customBreakdown.vhkt : 0}
+                                  onChange={e => setCustomBreakdown(prev => ({ ...prev, vhkt: parseFloat(e.target.value) || 0 }))}
+                                  className={`w-28 text-right font-black text-xs px-2 py-1 rounded border ${enabledItems.vhkt ? 'bg-slate-50 border-slate-300 text-slate-800' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                />
+                              </div>
+
+                              {/* Giảm trừ dùng chung (Anten) */}
+                              {(
+                                <div className="flex items-center justify-between bg-rose-50/60 p-1.5 rounded-lg border border-rose-200/80">
+                                  <label className="flex items-center gap-1.5 cursor-pointer font-extrabold text-rose-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={enabledItems.giam_tru}
+                                      onChange={e => {
+                                        const checked = e.target.checked
+                                        setEnabledItems(prev => ({ ...prev, giam_tru: checked }))
+                                        if (checked && customBreakdown.giam_tru === 0) {
+                                          setCustomBreakdown(prev => ({ ...prev, giam_tru: -Math.round((prev.cot || 0) * 0.2) }))
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 text-rose-600 rounded focus:ring-rose-500 cursor-pointer"
+                                    />
+                                    <span>🔻 Giảm trừ dùng chung (Anten)</span>
+                                  </label>
+                                  <input
+                                    type="number"
+                                    disabled={!enabledItems.giam_tru}
+                                    value={enabledItems.giam_tru ? customBreakdown.giam_tru : 0}
+                                    onChange={e => setCustomBreakdown(prev => ({ ...prev, giam_tru: parseFloat(e.target.value) || 0 }))}
+                                    className={`w-28 text-right font-black text-xs px-2 py-1 rounded border ${enabledItems.giam_tru ? 'bg-white border-rose-300 text-rose-700' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Tổng cộng tự động tính */}
+                              <div className="pt-2 mt-1 border-t border-slate-200 flex justify-between items-center text-[11px] text-blue-700">
+                                <span className="font-extrabold uppercase tracking-widest">Tổng cộng hạng mục đã tích:</span>
+                                <span className="font-black text-xs text-blue-800">{formatCurrency(
+                                  (enabledItems.mb ? customBreakdown.mb : 0) +
+                                  (enabledItems.pm ? customBreakdown.pm : 0) +
+                                  (enabledItems.mfd ? customBreakdown.mfd : 0) +
+                                  (enabledItems.cot ? customBreakdown.cot : 0) +
+                                  (enabledItems.vhkt ? customBreakdown.vhkt : 0) +
+                                  (enabledItems.giam_tru ? customBreakdown.giam_tru : 0)
+                                )}</span>
+                              </div>
+
+                              {/* Nút 1-click cập nhật nhanh giá chốt đàm phán */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const total = (enabledItems.mb ? customBreakdown.mb : 0) +
+                                    (enabledItems.pm ? customBreakdown.pm : 0) +
+                                    (enabledItems.mfd ? customBreakdown.mfd : 0) +
+                                    (enabledItems.cot ? customBreakdown.cot : 0) +
+                                    (enabledItems.vhkt ? customBreakdown.vhkt : 0) +
+                                    (enabledItems.giam_tru ? customBreakdown.giam_tru : 0);
+                                  setNewPriceConfirmed(total.toString());
+                                }}
+                                className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-wider rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                              >
+                                ⚡ Áp dụng làm Giá chốt đàm phán
+                              </button>
                             </div>
-                            
-                            <div className="max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
-                              <table className="w-full text-left border-separate border-spacing-y-1.5">
-                                <thead>
-                                  <tr className="text-[10px] font-black text-slate-400 uppercase border-b border-slate-100">
-                                    <th className="pb-2 pl-1">Kỳ</th>
-                                    <th className="pb-2">Thời gian thanh toán</th>
-                                    <th className="pb-2 text-right">Số tiền dự kiến</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="text-[10.5px]">
-                                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                  {alignedPaymentCycles.cycles.map((cycle: any) => (
-                                    <tr key={cycle.index} className={`group ${cycle.is_partial ? 'bg-indigo-50 border-2 border-indigo-200' : 'bg-slate-50 border border-slate-100'} rounded-xl overflow-hidden hover:scale-[1.01] transition-all`}>
-                                      <td className="p-3 rounded-l-xl font-black text-slate-500 group-hover:text-blue-700">
-                                        #{cycle.index}
-                                      </td>
-                                      <td className="p-3 font-bold text-slate-700">
-                                        <div className="flex flex-col gap-0.5">
-                                          <span className="text-[11px] text-slate-900">{cycle.start}</span>
-                                          <span className="text-[9px] text-slate-400 font-bold">đến {cycle.end}</span>
-                                        </div>
-                                      </td>
-                                      <td className="p-3 rounded-r-xl text-right font-black text-slate-900 text-[11.5px]">
-                                        {formatCurrency(cycle.amount)}
-                                        {cycle.is_partial && (
-                                          <div className="text-[8px] text-indigo-500 font-black uppercase mt-0.5">Kỳ lẻ dồn</div>
-                                        )}
-                                      </td>
+                          </details>
+
+
+
+                          {/* 3b. CHU KỲ THANH TOÁN DỰ KIẾN (THU GỌN GẬP MỞ) */}
+                          {alignedPaymentCycles && (
+                            <details className="group border border-blue-200/80 rounded-xl bg-blue-50/20 p-2.5 transition-all text-left">
+                              <summary className="text-[10px] font-black text-blue-800 uppercase tracking-widest flex items-center justify-between cursor-pointer select-none">
+                                <span className="flex items-center gap-1.5">
+                                  <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                                  Chu kỳ thanh toán dự kiến ({alignedPaymentCycles.cycles.length} kỳ)
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[9px] font-black text-white bg-blue-600 px-2 py-0.5 rounded-full">
+                                    End: {alignedPaymentCycles.endDate}
+                                  </span>
+                                  <span className="text-blue-500 group-open:rotate-180 transition-transform text-xs">▼</span>
+                                </div>
+                              </summary>
+
+                              <div className="mt-2.5 max-h-[180px] overflow-y-auto pr-1 custom-scrollbar">
+                                <table className="w-full text-left border-separate border-spacing-y-1">
+                                  <thead>
+                                    <tr className="text-[9px] font-black text-slate-400 uppercase border-b border-slate-100">
+                                      <th className="pb-1 pl-1">Kỳ</th>
+                                      <th className="pb-1">Thời gian thanh toán</th>
+                                      <th className="pb-1 text-right">Số tiền</th>
                                     </tr>
+                                  </thead>
+                                  <tbody className="text-[10px]">
+                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                    {alignedPaymentCycles.cycles.map((cycle: any) => (
+                                      <tr key={cycle.index} className={`group/row ${cycle.is_partial ? 'bg-indigo-50/80 border border-indigo-200' : 'bg-slate-50 border border-slate-100'} rounded-lg overflow-hidden`}>
+                                        <td className="p-2 rounded-l-lg font-black text-slate-500 group-hover/row:text-blue-700">
+                                          #{cycle.index}
+                                        </td>
+                                        <td className="p-2 font-bold text-slate-700">
+                                          <div className="flex flex-col">
+                                            <span className="text-[10.5px] text-slate-900">{cycle.start}</span>
+                                            <span className="text-[8.5px] text-slate-400">đến {cycle.end}</span>
+                                          </div>
+                                        </td>
+                                        <td className="p-2 rounded-r-lg text-right font-black text-slate-900 text-[10.5px]">
+                                          {formatCurrency(cycle.amount)}
+                                          {cycle.is_partial && (
+                                            <div className="text-[7.5px] text-indigo-500 font-black uppercase">Kỳ lẻ dồn</div>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </details>
+                          )}
+
+                          {/* 3. THÔNG TIN ĐỐI SOÁT TÀI KHOẢN BANK */}
+                          <div className={`p-3 rounded-xl border text-xs font-bold space-y-1 text-left ${selectedSite.banking_info?.is_owner_match ? 'bg-emerald-50/50 border-emerald-200 text-emerald-800' : 'bg-rose-50/50 border-rose-200 text-rose-800'}`}>
+                            <div className="font-black text-[10.5px]">
+                              💳 CHI TIẾT TÀI KHOẢN BANK: {selectedSite.banking_info?.is_owner_match ? '✅ TRÙNG KHỚP' : '⚠️ LỆCH CHỦ THỂ'}
+                            </div>
+                            <div className="text-[10px] text-slate-600 font-bold space-y-0.5 mt-1">
+                              <div>🏦 <span className="text-slate-400 font-semibold">Ngân hàng:</span> <span className="text-slate-800 font-black">{selectedSite.banking_info?.bank_name} - {selectedSite.banking_info?.bank_branch}</span></div>
+                              <div>🔢 <span className="text-slate-400 font-semibold">Số TK:</span> <span className="text-slate-800 font-black">{selectedSite.banking_info?.account_no}</span></div>
+                              <div>👤 <span className="text-slate-400 font-semibold">Chủ TK:</span> <span className="text-slate-800 font-black">{selectedSite.banking_info?.account_owner}</span></div>
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* CHỌN PHIẾU ĐIỀU CHỈNH & TIẾN ĐỘ */}
+                        <div className="space-y-3">
+                          {/* Dropbox chọn mẫu biểu mẫu */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block text-left">
+                              📁 1. Chọn file Word (.docx) cần xuất:
+                            </label>
+                            <div className="relative text-left">
+                              <select
+                                value={editTemplate}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditTemplate(val);
+                                  if (val.includes('ngan_han')) {
+                                    setExtensionYears(2);
+                                  } else if (val.includes('gia_han')) {
+                                    setExtensionYears(5);
+                                  }
+                                }}
+                                className="w-full bg-slate-50 border border-slate-200 text-xs font-black text-slate-700 rounded-xl px-3 py-2.5 appearance-none focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm focus:bg-white"
+                              >
+                                {TEMPLATE_CONFIGS.map(t => {
+                                  return (
+                                    <option key={t.id} value={t.id}>
+                                      {t.name} {!t.ready && '(Đang phát triển)'}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                              <ChevronDown className="absolute right-3.5 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                            </div>
+
+                            {editTemplate.includes('gia_han') && (
+                              <div className="space-y-1 mt-2 text-left bg-blue-50/40 p-2 rounded-xl border border-blue-100">
+                                <label className="text-[9px] font-black text-blue-700 uppercase block">
+                                  ⏳ Số năm gia hạn hợp đồng:
+                                </label>
+                                <select
+                                  value={extensionYears}
+                                  onChange={(e) => setExtensionYears(parseInt(e.target.value))}
+                                  className="w-full bg-white border border-blue-200 text-xs font-black text-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500 shadow-sm"
+                                >
+                                  <option value={1}>1 năm (Ngắn hạn)</option>
+                                  <option value={2}>2 năm (Ngắn hạn - Phổ biến)</option>
+                                  <option value={3}>3 năm (Ngắn hạn)</option>
+                                  <option value={4}>4 năm (Ngắn hạn)</option>
+                                  <option value={5}>5 năm (Tiêu chuẩn)</option>
+                                </select>
+                              </div>
+                            )}
+
+                            {['phu_luc_gia_han', 'phu_luc_gia_han_ngan_han', 'thanh_ly_ky_lai', 'phu_luc_giam_gia', 'phu_luc_giam_gia_gia_han', 'phu_luc_giam_gia_gia_han_ngan_han', 'thanh_ly_ky_moi', 'ky_moi_hop_dong', 'phu_luc_cct_a', 'phu_luc_cct_a_gia_han', 'phu_luc_cct', 'phu_luc_cct_gia_han'].includes(editTemplate) && (
+                              <div className="space-y-1 mt-2 text-left bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id="applyVb1245"
+                                    checked={applyVb1245}
+                                    onChange={(e) => setApplyVb1245(e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <label htmlFor="applyVb1245" className="text-[11px] font-black text-slate-700 cursor-pointer select-none">
+                                    Áp dụng giảm trừ VB1245 (hồi cứu từ 01/10/2025)
+                                  </label>
+                                </div>
+                                <p className="text-[9.5px] text-slate-500 font-medium pl-6 leading-tight">
+                                  {applyVb1245 ? (
+                                    <span className="text-amber-700 font-bold">✓ Đang bật: Hồi cứu giảm trừ tiền đã thanh toán từ 01/10/2025.</span>
+                                  ) : (
+                                    <span className="text-emerald-700 font-bold">✓ Chạy HĐ mới độc lập: Bắt đầu từ ngày HĐ mới, KHÔNG cấn trừ chu kỳ cũ.</span>
+                                  )}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* TIẾN ĐỘ, SỐ HĐ MỚI & BBLV (GẬP MỞ GỌN GÀNG, KHÔNG CHIẾM DIỆN TÍCH) */}
+                        <details className="group border border-slate-200/80 rounded-xl bg-slate-50/50 p-2.5 transition-all text-left">
+                          <summary className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center justify-between cursor-pointer select-none">
+                            <span className="flex items-center gap-1.5">
+                              ⚙️ Tuỳ chọn nâng cao (Tiến độ, Số HĐ & BBLV)
+                            </span>
+                            <span className="text-slate-400 group-open:rotate-180 transition-transform text-xs">▼</span>
+                          </summary>
+
+                          <div className="mt-3 space-y-3 pt-2 border-t border-slate-200/60">
+                            {/* Dropbox cập nhật tiến độ */}
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest block text-left">
+                                Trạng thái tiến độ thực tế:
+                              </label>
+                              <div className="relative text-left">
+                                <select
+                                  value={editStatus}
+                                  onChange={(e) => setEditStatus(e.target.value)}
+                                  className="w-full bg-blue-50/50 border border-blue-200 text-xs font-black text-blue-700 rounded-lg px-2.5 py-1.5 appearance-none focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm focus:bg-white"
+                                >
+                                  {STATUS_CATEGORIES.map(cat => (
+                                    <option key={cat.id} value={cat.id} className="text-slate-800 font-semibold">
+                                      {cat.name}
+                                    </option>
                                   ))}
-                                </tbody>
-                              </table>
+                                </select>
+                                <ChevronDown className="absolute right-3 top-2.5 w-3.5 h-3.5 text-blue-500 pointer-events-none" />
+                              </div>
                             </div>
-                          </div>
-                        )}
 
-                        {/* 3. THÔNG TIN ĐỐI SOÁT TÀI KHOẢN BANK */}
-                        <div className={`p-3 rounded-xl border text-xs font-bold space-y-1 text-left ${selectedSite.banking_info?.is_owner_match ? 'bg-emerald-50/50 border-emerald-200 text-emerald-800' : 'bg-rose-50/50 border-rose-200 text-rose-800'}`}>
-                          <div className="font-black text-[10.5px]">
-                            💳 CHI TIẾT TÀI KHOẢN BANK: {selectedSite.banking_info?.is_owner_match ? '✅ TRÙNG KHỚP' : '⚠️ LỆCH CHỦ THỂ'}
-                          </div>
-                          <div className="text-[10px] text-slate-600 font-bold space-y-0.5 mt-1">
-                            <div>🏦 <span className="text-slate-400 font-semibold">Ngân hàng:</span> <span className="text-slate-800 font-black">{selectedSite.banking_info?.bank_name} - {selectedSite.banking_info?.bank_branch}</span></div>
-                            <div>🔢 <span className="text-slate-400 font-semibold">Số TK:</span> <span className="text-slate-800 font-black">{selectedSite.banking_info?.account_no}</span></div>
-                            <div>👤 <span className="text-slate-400 font-semibold">Chủ TK:</span> <span className="text-slate-800 font-black">{selectedSite.banking_info?.account_owner}</span></div>
-                          </div>
-                        </div>
+                            {/* Số HĐ Gia Hạn Mới / Ký */}
+                            {(editTemplate === 'thanh_ly_ky_lai' || editTemplate === 'phu_luc_gia_han' || editTemplate === 'phu_luc_giam_gia_gia_han' || editTemplate === 'thanh_ly_ky_moi' || editTemplate === 'ky_moi_hop_dong' || editTemplate === 'phu_luc_cct_a_gia_han' || editTemplate === 'phu_luc_cct_gia_han' || editStatus === 'gia_han_5_nam') && (
+                              <div className="space-y-2 bg-white p-2 rounded-lg border border-slate-200 text-left">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <label className="text-[8.5px] font-black text-slate-500 uppercase">Số HĐ Mới:</label>
+                                    <input
+                                      type="text"
+                                      value={newContractNo}
+                                      onChange={e => setNewContractNo(e.target.value)}
+                                      placeholder="Số HĐ / PL mới..."
+                                      className="w-full bg-slate-50 text-xs text-slate-700 p-1.5 rounded border border-slate-200 focus:outline-none focus:border-blue-500"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[8.5px] font-black text-slate-500 uppercase">Ngày Bắt Đầu:</label>
+                                    <input
+                                      type="text"
+                                      value={newContractDate}
+                                      onChange={e => setNewContractDate(e.target.value)}
+                                      placeholder="dd/mm/yyyy..."
+                                      className="w-full bg-slate-50 text-xs font-bold text-blue-700 p-1.5 rounded border border-slate-200 focus:outline-none focus:border-blue-500"
+                                    />
+                                  </div>
+                                </div>
 
-                      </div>
+                                <div className="flex items-center gap-1.5 pt-0.5">
+                                  <span className="text-[8px] font-extrabold text-slate-400 uppercase shrink-0">Chọn:</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewContractDate('01/01/2027')}
+                                    className={`px-1.5 py-0.5 text-[8.5px] font-black rounded transition-all border ${newContractDate === '01/01/2027' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'}`}
+                                  >
+                                    01/01/2027
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewContractDate('01/01/2026')}
+                                    className={`px-1.5 py-0.5 text-[8.5px] font-black rounded transition-all border ${newContractDate === '01/01/2026' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}`}
+                                  >
+                                    01/01/2026
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewContractDate('01/10/2025')}
+                                    className={`px-1.5 py-0.5 text-[8.5px] font-black rounded transition-all border ${newContractDate === '01/10/2025' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}`}
+                                  >
+                                    01/10/2025
+                                  </button>
+                                </div>
+                              </div>
+                            )}
 
-                      {/* CHỌN PHIẾU ĐIỀU CHỈNH & TIẾN ĐỘ */}
-                      <div className="space-y-3">
-                        {/* Dropbox chọn mẫu biểu mẫu */}
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block text-left">
-                            📁 1. Chọn file Word (.docx) cần xuất:
-                          </label>
-                          <div className="relative text-left">
-                            <select 
-                              value={editTemplate}
-                              onChange={(e) => setEditTemplate(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 text-xs font-black text-slate-700 rounded-xl px-3 py-2.5 appearance-none focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm focus:bg-white"
-                            >
-                              {TEMPLATE_CONFIGS.map(t => {
-                                return (
-                                  <option key={t.id} value={t.id}>
-                                    {t.name} {!t.ready && '(Đang phát triển)'}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                            <ChevronDown className="absolute right-3.5 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-                          </div>
-                        </div>
-
-                        {/* Dropbox cập nhật tiến độ */}
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest block text-left">
-                            ⚙️ 2. Trạng thái tiến độ thực tế:
-                          </label>
-                          <div className="relative text-left">
-                            <select 
-                              value={editStatus}
-                              onChange={(e) => setEditStatus(e.target.value)}
-                              className="w-full bg-blue-50/50 border border-blue-200 text-xs font-black text-blue-700 rounded-xl px-3 py-2.5 appearance-none focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm focus:bg-white"
-                            >
-                              {STATUS_CATEGORIES.map(cat => (
-                                <option key={cat.id} value={cat.id} className="text-slate-800 font-semibold">
-                                  {cat.name}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="absolute right-3.5 top-3 w-4 h-4 text-blue-500 pointer-events-none" />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* PHẦN ĐIỀN THÔNG TIN THỰC TẾ ĐỂ ĐƯA VÀO BÁO CÁO THỐNG KÊ */}
-                      <div className="border-t border-slate-100 pt-3 space-y-3">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block text-left">
-                          📝 3. Cập nhật số liệu đàm phán chốt:
-                        </span>
-
-                        {/* Nếu là Gia hạn hợp đồng */}
-                        {(editTemplate === 'thanh_ly_ky_lai' || editTemplate === 'phu_luc_gia_han' || editStatus === 'gia_han_5_nam') && (
-                          <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200/50 text-left">
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-500 uppercase">Số HĐ Gia Hạn Mới:</label>
-                              <input 
-                                type="text"
-                                value={newContractNo}
-                                onChange={e => setNewContractNo(e.target.value)}
-                                placeholder="Số HĐ / PL mới..."
-                                className="w-full bg-white text-xs text-slate-700 p-1.5 rounded border border-slate-200 focus:outline-none focus:border-blue-500"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-500 uppercase">Ngày Ký Mới:</label>
-                              <input 
-                                type="text"
-                                value={newContractDate}
-                                onChange={e => setNewContractDate(e.target.value)}
-                                placeholder="ngày/tháng/năm..."
-                                className="w-full bg-white text-xs text-slate-700 p-1.5 rounded border border-slate-200 focus:outline-none focus:border-blue-500"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Nếu là giảm giá thuê */}
-                        {(editTemplate === 'phu_luc_giam_gia' || editTemplate === 'thanh_ly_ky_lai' || editStatus === 'dong_y') && (
-                          <div className="space-y-1 bg-slate-50 p-2.5 rounded-xl border border-slate-200/50 text-left">
-                            <label className="text-[9px] font-black text-slate-500 uppercase">Đơn giá mới sau đàm phán (VND):</label>
-                            <div className="relative">
-                              <input 
+                            {/* Đơn giá mới sau đàm phán (VND) */}
+                            <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200 text-left">
+                              <div className="flex justify-between items-center">
+                                <label className="text-[8.5px] font-black text-slate-500 uppercase">Đơn giá mới chốt (VND):</label>
+                                {newPriceConfirmed && !isNaN(parseFloat(newPriceConfirmed)) && (
+                                  <span className="text-[9px] text-emerald-600 font-extrabold">
+                                    {formatCurrency(parseFloat(newPriceConfirmed))}
+                                  </span>
+                                )}
+                              </div>
+                              <input
                                 type="text"
                                 value={newPriceConfirmed}
-                                onChange={e => setNewPriceConfirmed(e.target.value)}
+                                onChange={e => {
+                                  const raw = e.target.value.replace(/[^\d]/g, '');
+                                  setNewPriceConfirmed(raw);
+                                }}
                                 placeholder="Nhập số tiền..."
-                                className="w-full bg-white text-xs font-black text-emerald-600 p-2 rounded border border-slate-200 focus:outline-none focus:border-blue-500"
+                                className="w-full bg-slate-50 text-xs font-black text-emerald-600 p-1.5 rounded border border-slate-200 focus:outline-none focus:border-blue-500"
                               />
-                              {newPriceConfirmed && !isNaN(parseFloat(newPriceConfirmed)) && (
-                                <span className="absolute right-2 top-2 text-[9px] text-slate-400 font-extrabold">
-                                  {formatCurrency(parseFloat(newPriceConfirmed))}
-                                </span>
-                              )}
                             </div>
+
+                            {/* Checklist 4 bước */}
+                            <div className="space-y-1.5">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+                                📋 Checklist tiến độ {(editStatus === 'can_thanh_ly' || editStatus === 'gia_han_5_nam') ? 'HĐ Mới' : 'PL Giảm Giá'}:
+                              </span>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleStep('draft_prepared')}
+                                  className={`p-1.5 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${selectedSite.progress_tracker.progress.draft_prepared ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-white border-slate-200'}`}
+                                >
+                                  <span className="text-[9px] font-bold">1. Đã soạn Word</span>
+                                  <span className="text-xs font-black">{selectedSite.progress_tracker.progress.draft_prepared ? '✓' : '○'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => toggleStep('submitted_internal')}
+                                  className={`p-1.5 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${selectedSite.progress_tracker.progress.submitted_internal ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-white border-slate-200'}`}
+                                >
+                                  <span className="text-[9px] font-bold">2. Trình Ký</span>
+                                  <span className="text-xs font-black">{selectedSite.progress_tracker.progress.submitted_internal ? '✓' : '○'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => toggleStep('signed_and_stamped')}
+                                  className={`p-1.5 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${selectedSite.progress_tracker.progress.signed_and_stamped ? 'bg-blue-50 border-blue-300 text-blue-800' : 'bg-white border-slate-200'}`}
+                                >
+                                  <span className="text-[9px] font-bold">3. Đã ký Bên A-B</span>
+                                  <span className="text-xs font-black">{selectedSite.progress_tracker.progress.signed_and_stamped ? '✓' : '○'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => toggleStep('archived_doc')}
+                                  className={`p-1.5 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${selectedSite.progress_tracker.progress.archived_doc ? 'bg-indigo-50 border-indigo-300 text-indigo-800' : 'bg-white border-slate-200'}`}
+                                >
+                                  <span className="text-[9px] font-bold">4. Lưu văn thư</span>
+                                  <span className="text-xs font-black">{selectedSite.progress_tracker.progress.archived_doc ? '✓' : '○'}</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Cấu hình Biên bản làm việc */}
+                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/50">
+                              <div className="space-y-1">
+                                <label className="text-[8.5px] font-black text-slate-500 uppercase block">Đại Diện Bên A:</label>
+                                <select
+                                  value={bblvRepresentative}
+                                  onChange={e => setBblvRepresentative(e.target.value)}
+                                  className="w-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700 rounded-lg px-2 py-1 appearance-none focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                                >
+                                  <option value="Lê Thanh Quang">Lê Thanh Quang</option>
+                                  <option value="Lê Tân Cảng">Lê Tân Cảng</option>
+                                  <option value="Trần Đăng Phan">Trần Đăng Phan</option>
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[8.5px] font-black text-slate-500 uppercase block">Kịch bản BBLV:</label>
+                                <select
+                                  value={bblvScenario}
+                                  onChange={e => setBblvScenario(e.target.value)}
+                                  className="w-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700 rounded-lg px-2 py-1 appearance-none focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                                >
+                                  <option value="auto">🤖 Tự động</option>
+                                  <option value="giam_gia">📉 Giảm giá</option>
+                                  <option value="gia_han">⏳ Gia hạn</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Nút lưu thủ công */}
+                            <button
+                              onClick={saveChangesToServer}
+                              disabled={savingProgress}
+                              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-sm active:scale-98"
+                            >
+                              {savingProgress ? 'Đang lưu trữ...' : '💾 Lưu tiến độ & số liệu chốt'}
+                            </button>
+                          </div>
+                        </details>
+
+                      </div>
+
+                      {/* ACTION BAR XUẤT FILE WORD GỌN GÀNG, CỐ ĐỊNH Ở ĐÁY */}
+                      <div className="shrink-0 p-4 border-t border-slate-200/80 bg-white/95 backdrop-blur-sm shadow-[0_-4px_16px_rgba(0,0,0,0.04)] space-y-2 z-10">
+                        <button
+                          onClick={handleGenerate}
+                          disabled={generating || !TEMPLATE_CONFIGS.find(t => t.id === editTemplate)?.ready}
+                          className={`w-full py-3 px-4 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 ${TEMPLATE_CONFIGS.find(t => t.id === editTemplate)?.ready
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-98 shadow-emerald-500/20'
+                            : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                            }`}
+                        >
+                          {generating ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Đang soạn thảo file Word...</span>
+                            </>
+                          ) : (
+                            <>
+                              <FileDown className="w-4 h-4" />
+                              <span>Sinh Tệp Word & Mở Ngay</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* Cụm nút thao tác mở/tải file 1 hàng ngang tinh gọn */}
+                        {downloadFilename && (
+                          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-left">
+                            <div className="flex items-center justify-between text-[10.5px] font-black text-slate-700 px-0.5">
+                              <span className="truncate max-w-[200px]" title={downloadFilename}>✓ {downloadFilename}</span>
+                              <span className="text-[8.5px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-black uppercase">Đã tạo</span>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-1.5">
+                              <button
+                                onClick={() => openFileDirectly(downloadFilename).catch(err => alert(err.message))}
+                                className="py-2 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer"
+                                title="Mở trực tiếp file Word trên máy tính"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                Mở Word
+                              </button>
+
+                              <button
+                                onClick={() => openFolder().catch(err => alert(err.message))}
+                                className="py-2 px-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer"
+                                title="Mở thư mục output trên máy tính"
+                              >
+                                <FolderOpen className="w-3.5 h-3.5" />
+                                Thư Mục
+                              </button>
+
+                              <button
+                                onClick={() => downloadFileHelper(downloadFilename)}
+                                className="py-2 px-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer"
+                                title="Lưu vào thư mục tải về gần nhất"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                Lưu / Tải
+                              </button>
+                            </div>
+
+                            {extraFiles && extraFiles.length > 0 && (
+                              <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                                <span className="text-[9.5px] font-bold text-slate-500">Biên bản (BBLV):</span>
+                                <div className="flex gap-1.5">
+                                  {extraFiles.map((extFile, idx) => (
+                                    <div key={idx} className="flex gap-1">
+                                      <button
+                                        onClick={() => openFileDirectly(extFile).catch(err => alert(err.message))}
+                                        className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
+                                        title="Mở Word BBLV"
+                                      >
+                                        <FileText className="w-3 h-3" />
+                                        Mở BBLV
+                                      </button>
+                                      <button
+                                        onClick={() => downloadFileHelper(extFile)}
+                                        className="px-2 py-1 bg-slate-600 hover:bg-slate-700 text-white rounded text-[9px] font-black uppercase flex items-center gap-1 cursor-pointer"
+                                        title="Lưu BBLV"
+                                      >
+                                        <Download className="w-3 h-3" />
+                                        Tải
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
-
-                        {/* Nút lưu thủ công */}
-                        <button
-                          onClick={saveChangesToServer}
-                          disabled={savingProgress}
-                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm active:scale-98"
-                        >
-                          {savingProgress ? 'Đang lưu trữ...' : '💾 Lưu tiến độ & số liệu chốt'}
-                        </button>
                       </div>
-
-                      {/* TIẾN TRÌNH TRÌNH KÝ CHECKLIST */}
-                      <div className="space-y-1.5 pt-2 border-t border-slate-100 text-left">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                          📋 4. Checklist tiến độ {(editStatus === 'can_thanh_ly' || editStatus === 'gia_han_5_nam') ? 'Hợp Đồng Mới' : 'Phụ Lục Giảm Giá'}:
-                        </span>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button 
-                            onClick={() => toggleStep('draft_prepared')}
-                            className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${selectedSite.progress_tracker.progress.draft_prepared ? 'bg-emerald-50/50 border-emerald-300 text-emerald-800' : 'bg-slate-50 border-slate-200'}`}
-                          >
-                            <span className="text-[9px] text-slate-400 font-extrabold uppercase">Bước 1</span>
-                            <span className="text-[10px] font-extrabold text-slate-800 mt-1">Đã soạn {(editStatus === 'can_thanh_ly' || editStatus === 'gia_han_5_nam') ? 'Word HĐ' : 'Word PL'}</span>
-                          </button>
-
-                          <button 
-                            onClick={() => toggleStep('submitted_internal')}
-                            className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${selectedSite.progress_tracker.progress.submitted_internal ? 'bg-emerald-50/50 border-emerald-300 text-emerald-800' : 'bg-slate-50 border-slate-200'}`}
-                          >
-                            <span className="text-[9px] text-slate-400 font-extrabold uppercase">Bước 2</span>
-                            <span className="text-[10px] font-extrabold text-slate-800 mt-1">Trình Ký {(editStatus === 'can_thanh_ly' || editStatus === 'gia_han_5_nam') ? 'HĐ' : 'PL'}</span>
-                          </button>
-
-                          <button 
-                            onClick={() => toggleStep('signed_and_stamped')}
-                            className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${selectedSite.progress_tracker.progress.signed_and_stamped ? 'bg-blue-50/50 border-blue-300 text-blue-800' : 'bg-slate-50 border-slate-200'}`}
-                          >
-                            <span className="text-[9px] text-slate-400 font-extrabold uppercase">Bước 3</span>
-                            <span className="text-[10px] font-extrabold text-slate-800 mt-1">Đã ký Bên A-B</span>
-                          </button>
-
-                          <button 
-                            onClick={() => toggleStep('archived_doc')}
-                            className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${selectedSite.progress_tracker.progress.archived_doc ? 'bg-indigo-50/50 border-indigo-300 text-indigo-800' : 'bg-slate-50 border-slate-200'}`}
-                          >
-                            <span className="text-[9px] text-slate-400 font-extrabold uppercase">Bước 4</span>
-                            <span className="text-[10px] font-extrabold text-slate-800 mt-1">Lưu văn thư</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* THAO TÁC ENGINE WORD TỰ ĐỘNG Ở DƯỚI PANEL */}
-                      <div className="border-t border-slate-100 pt-3.5 mt-2 flex items-center justify-between">
-                        <div className="text-left">
-                          <span className="text-[10px] text-slate-400 font-bold block">Engine điền mẫu:</span>
-                          <span className="text-[11px] font-black text-slate-800 uppercase tracking-wider">Run-Preserving V4</span>
-                        </div>
-                        
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={handleGenerate}
-                            disabled={generating || !['thanh_ly_ky_lai', 'phu_luc_giam_gia', 'phu_luc_gia_han', 'phu_luc_giam_gia_gia_han'].includes(editTemplate)}
-                            className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm ${['thanh_ly_ky_lai', 'phu_luc_giam_gia', 'phu_luc_gia_han', 'phu_luc_giam_gia_gia_han'].includes(editTemplate) ? 'bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95 shadow-emerald-500/10' : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200/50'}`}
-                          >
-                            {generating ? 'Đang tạo...' : 'Sinh Tệp Word'}
-                          </button>
-                          {downloadFilename && (
-                            <a
-                              href={`/api/download/${downloadFilename}`}
-                              download
-                              className="px-3 py-2 text-[10px] font-black uppercase tracking-wider bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow flex items-center gap-1 active:scale-95 shadow-blue-500/10 animate-bounce"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              Tải Về (.docx)
-                            </a>
-                          )}
-                        </div>
-                      </div>
-
                     </div>
                   ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400 font-bold text-xs space-y-2">
@@ -1272,7 +1844,7 @@ function doPost(e) {
                       💡 Riêng Tổ VT3: Trình ký phụ lục chưa được tính là Hoàn Thành
                     </span>
                   </div>
-                  
+
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
@@ -1301,9 +1873,9 @@ function doPost(e) {
                             <td className="p-3.5 pl-6">
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
-                                  <div 
-                                    className={`h-full rounded-full transition-all duration-500 ${vt.pct > 70 ? 'bg-emerald-500' : vt.pct > 40 ? 'bg-blue-500' : 'bg-rose-500'}`} 
-                                    style={{ width: `${vt.pct}%` }} 
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-500 ${vt.pct > 70 ? 'bg-emerald-500' : vt.pct > 40 ? 'bg-blue-500' : 'bg-rose-500'}`}
+                                    style={{ width: `${vt.pct}%` }}
                                   />
                                 </div>
                                 <span className="text-[10px] font-black text-slate-600" style={{ minWidth: '32px' }}>{vt.pct}%</span>
@@ -1321,7 +1893,7 @@ function doPost(e) {
             {/* VIEW 3: CÀI ĐẶT HỆ THỐNG (GOOGLE SHEETS INTEGRATION) */}
             {activeMenu === 'Cài đặt hệ thống' && (
               <div className="flex-1 overflow-y-auto p-8 flex gap-8">
-                
+
                 {/* Panel Trái: Cấu hình */}
                 <div className="w-1/2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5 h-max">
                   <div>
@@ -1335,7 +1907,7 @@ function doPost(e) {
                   <div className="space-y-4">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Google Spreadsheet ID:</label>
-                      <input 
+                      <input
                         type="text"
                         value={spreadsheetId}
                         onChange={e => setSpreadsheetId(e.target.value)}
@@ -1347,7 +1919,7 @@ function doPost(e) {
 
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">Google Apps Script Web App URL (Sync Online):</label>
-                      <input 
+                      <input
                         type="text"
                         value={webAppUrl}
                         onChange={e => setWebAppUrl(e.target.value)}
@@ -1387,14 +1959,14 @@ function doPost(e) {
 
                   <div className="space-y-3.5 text-[11px] font-medium text-slate-300 leading-relaxed">
                     <p className="font-extrabold text-white text-xs">Thực hiện các bước cực kỳ dễ dàng sau để bật đồng bộ trực tuyến:</p>
-                    
+
                     <ol className="list-decimal pl-5 space-y-2 text-[10px]">
                       <li>Mở Google Sheets của bạn. Đảm bảo sheet có các tab tên: <span className="text-white font-extrabold">"hopdong"</span> và <span className="text-white font-extrabold">"tien do"</span>.</li>
                       <li>Vào menu <span className="text-emerald-400 font-extrabold">Mở rộng (Extensions)</span> → nhấp chọn <span className="text-emerald-400 font-extrabold">Apps Script</span>.</li>
                       <li>Xóa toàn bộ mã mặc định hiện có, sao chép toàn bộ khối mã code màu xám bên dưới và dán vào.</li>
                       <li>Nhấp vào nút <span className="text-white font-extrabold">Triển khai (Deploy)</span> (góc phải trên) → chọn <span className="text-white font-extrabold">Triển khai mới (New deployment)</span>.</li>
                       <li>Nhấp biểu tượng bánh răng ở loại triển khai, chọn <span className="text-white font-extrabold">Ứng dụng web (Web app)</span>.</li>
-                      <li>Đặt cấu hình: 
+                      <li>Đặt cấu hình:
                         <ul className="list-disc pl-5 mt-1 space-y-0.5 text-slate-400">
                           <li>Thực thi dưới dạng: <span className="text-white font-semibold">Tôi (Execute as: Me)</span></li>
                           <li>Ai có quyền truy cập: <span className="text-emerald-400 font-extrabold">Mọi người (Anyone)</span></li>
@@ -1407,7 +1979,7 @@ function doPost(e) {
                     <div className="pt-2">
                       <div className="flex justify-between items-center mb-1 bg-slate-800 px-3 py-1.5 rounded-t-lg">
                         <span className="text-[9px] uppercase font-black text-slate-400">Mã nguồn Google Apps Script:</span>
-                        <button 
+                        <button
                           onClick={() => {
                             navigator.clipboard.writeText(appsScriptCode);
                             alert('Đã sao chép đoạn mã Apps Script vào bộ nhớ tạm!');

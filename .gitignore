@@ -1,7 +1,13 @@
 venv/
+backend/venv/
 __pycache__/
 *.pyc
+*.log
+*.bak
+.DS_Store
+dump.json
 .env
 .brain/
 output/
+archive/
 scratch/
